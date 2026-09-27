@@ -46,9 +46,15 @@ function resize(){
 resize();
 addEventListener("resize",resize);
 
-// CYBER RAPTOR ART
+// ---------- ART ----------
+
 const raptorImg=new Image();
 raptorImg.src="8BBBE99D-BE50-463D-AB99-9356374B034D.png";
+
+const enemyImg=new Image();
+enemyImg.src="223E8F5F-AC53-4AC9-9DAE-CCF47D50F608.png";
+
+// ---------- GAME ----------
 
 let state="start";
 let score=0;
@@ -61,9 +67,6 @@ const dino={
   x:82,
   y:250,
   vy:0,
-
-  // Smaller invisible collision area.
-  // Artwork is intentionally much larger.
   r:17
 };
 
@@ -103,7 +106,6 @@ function flap(){
 
   dino.vy=-7.2;
 
-  // Jet burst
   for(let i=0;i<5;i++){
     trails.push({
       x:dino.x-45,
@@ -136,19 +138,26 @@ function shoot(){
       y:dino.y-5,
       vx:2+Math.random()*4,
       vy:(Math.random()-.5)*3,
-      life:15
+      life:15,
+      type:"red"
     });
   }
 }
 
+// ---------- ENEMIES ----------
+
 function spawnEnemy(){
 
   enemies.push({
-    x:W+40,
-    y:70+Math.random()*(H-180),
-    vx:2.6+Math.random()*1.6,
-    r:18
+    x:W+80,
+    baseY:80+Math.random()*(H-190),
+    y:0,
+    vx:2.7+Math.random()*1.3,
+    r:20,
+    phase:Math.random()*Math.PI*2,
+    bob:10+Math.random()*13
   });
+
 }
 
 function spawnObstacle(){
@@ -174,15 +183,18 @@ function hitCircle(a,b){
   return dx*dx+dy*dy<r*r;
 }
 
-function explode(x,y){
+function explode(x,y,type="orange"){
 
-  for(let i=0;i<16;i++){
+  for(let i=0;i<20;i++){
 
     particles.push({
-      x,y,
-      vx:(Math.random()-.5)*7,
-      vy:(Math.random()-.5)*7,
-      life:25+Math.random()*15
+      x,
+      y,
+      vx:(Math.random()-.5)*8,
+      vy:(Math.random()-.5)*8,
+      life:25+Math.random()*18,
+      size:3+Math.random()*5,
+      type
     });
 
   }
@@ -199,8 +211,10 @@ function die(){
     localStorage.dinoHigh=high;
   }
 
-  explode(dino.x,dino.y);
+  explode(dino.x,dino.y,"red");
 }
+
+// ---------- UPDATE ----------
 
 function update(){
 
@@ -230,7 +244,6 @@ function update(){
   dino.vy+=.38;
   dino.y+=dino.vy;
 
-  // Constant subtle engine trail
   if(frame%3===0){
 
     trails.push({
@@ -244,16 +257,34 @@ function update(){
 
   }
 
-  if(dino.y<20 || dino.y>H-35) die();
+  if(dino.y<20 || dino.y>H-35){
+    die();
+  }
 
-  if(frame%105===0) spawnObstacle();
-  if(frame%145===0) spawnEnemy();
+  if(frame%105===0){
+    spawnObstacle();
+  }
 
-  bullets.forEach(b=>b.x+=b.vx);
+  if(frame%135===0){
+    spawnEnemy();
+  }
+
+  bullets.forEach(b=>{
+    b.x+=b.vx;
+  });
 
   bullets=bullets.filter(b=>b.x<W+30);
 
-  enemies.forEach(e=>e.x-=e.vx);
+  // Flying enemies bob up and down
+  enemies.forEach(e=>{
+
+    e.x-=e.vx;
+
+    e.y=
+      e.baseY+
+      Math.sin(frame*.055+e.phase)*e.bob;
+
+  });
 
   obstacles.forEach(o=>{
 
@@ -281,6 +312,7 @@ function update(){
 
   obstacles=obstacles.filter(o=>o.x>-80);
 
+  // Enemy collisions
   for(let i=enemies.length-1;i>=0;i--){
 
     const e=enemies[i];
@@ -296,9 +328,13 @@ function update(){
       const dx=b.x-e.x;
       const dy=b.y-e.y;
 
-      if(dx*dx+dy*dy<(e.r+b.r)*(e.r+b.r)){
+      if(
+        dx*dx+dy*dy <
+        (e.r+b.r)*(e.r+b.r)
+      ){
 
-        explode(e.x,e.y);
+        // Orange enemy destruction
+        explode(e.x,e.y,"orange");
 
         enemies.splice(i,1);
         bullets.splice(j,1);
@@ -310,8 +346,10 @@ function update(){
     }
   }
 
-  enemies=enemies.filter(e=>e.x>-50);
+  enemies=enemies.filter(e=>e.x>-100);
 }
+
+// ---------- BACKGROUND ----------
 
 function background(){
 
@@ -349,6 +387,8 @@ function background(){
   ctx.fillRect(0,H-30,W,30);
 }
 
+// ---------- CYBER RAPTOR ----------
+
 function drawRaptor(){
 
   ctx.save();
@@ -358,30 +398,48 @@ function drawRaptor(){
     dino.y
   );
 
-  // Slight nose-up/nose-down rotation based on velocity
-  const angle=Math.max(-.18,Math.min(.22,dino.vy*.025));
+  const angle=
+    Math.max(
+      -.18,
+      Math.min(.22,dino.vy*.025)
+    );
 
   ctx.rotate(angle);
 
-  // Red engine glow
-  const glow=ctx.createRadialGradient(
-    -42,8,2,
-    -42,8,42
+  // Red jet glow
+  const glow=
+    ctx.createRadialGradient(
+      -42,8,2,
+      -42,8,42
+    );
+
+  glow.addColorStop(
+    0,
+    "rgba(255,60,25,.8)"
   );
 
-  glow.addColorStop(0,"rgba(255,60,25,.8)");
-  glow.addColorStop(1,"rgba(255,20,0,0)");
+  glow.addColorStop(
+    1,
+    "rgba(255,20,0,0)"
+  );
 
   ctx.fillStyle=glow;
+
   ctx.beginPath();
   ctx.arc(-42,8,42,0,Math.PI*2);
   ctx.fill();
 
-  // Character art
-  if(raptorImg.complete && raptorImg.naturalWidth){
+  if(
+    raptorImg.complete &&
+    raptorImg.naturalWidth
+  ){
 
     const drawW=155;
-    const ratio=raptorImg.naturalHeight/raptorImg.naturalWidth;
+
+    const ratio=
+      raptorImg.naturalHeight/
+      raptorImg.naturalWidth;
+
     const drawH=drawW*ratio;
 
     ctx.drawImage(
@@ -392,10 +450,71 @@ function drawRaptor(){
       drawH
     );
 
-  } else {
+  }
+
+  ctx.restore();
+}
+
+// ---------- ORANGE RAPTOR DRONE ----------
+
+function drawEnemy(e){
+
+  ctx.save();
+
+  ctx.translate(e.x,e.y);
+
+  // Enemy faces LEFT toward player
+  ctx.scale(-1,1);
+
+  // Orange energy aura
+  const glow=
+    ctx.createRadialGradient(
+      0,0,5,
+      0,0,48
+    );
+
+  glow.addColorStop(
+    0,
+    "rgba(255,145,0,.20)"
+  );
+
+  glow.addColorStop(
+    1,
+    "rgba(255,100,0,0)"
+  );
+
+  ctx.fillStyle=glow;
+
+  ctx.beginPath();
+  ctx.arc(0,0,48,0,Math.PI*2);
+  ctx.fill();
+
+  if(
+    enemyImg.complete &&
+    enemyImg.naturalWidth
+  ){
+
+    const drawW=100;
+
+    const ratio=
+      enemyImg.naturalHeight/
+      enemyImg.naturalWidth;
+
+    const drawH=drawW*ratio;
+
+    ctx.drawImage(
+      enemyImg,
+      -drawW*.50,
+      -drawH*.50,
+      drawW,
+      drawH
+    );
+
+  }else{
 
     // Backup while image loads
-    ctx.fillStyle="#d9d9d9";
+    ctx.fillStyle="#ff9500";
+
     ctx.beginPath();
     ctx.arc(0,0,20,0,Math.PI*2);
     ctx.fill();
@@ -405,66 +524,72 @@ function drawRaptor(){
   ctx.restore();
 }
 
-function drawEnemy(e){
-
-  ctx.save();
-
-  ctx.translate(e.x,e.y);
-
-  ctx.fillStyle="#a70f22";
-
-  ctx.beginPath();
-  ctx.arc(0,0,e.r,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.fillStyle="#ff3a35";
-  ctx.fillRect(-23,-5,46,10);
-
-  ctx.fillStyle="#fff";
-
-  ctx.beginPath();
-  ctx.arc(-6,-3,4,0,Math.PI*2);
-  ctx.arc(6,-3,4,0,Math.PI*2);
-  ctx.fill();
-
-  ctx.restore();
-}
+// ---------- DRAW ----------
 
 function draw(){
 
   background();
 
-  // Jet trails
+  // Cyber Raptor engine trails
   trails.forEach(t=>{
 
-    ctx.globalAlpha=Math.max(0,t.life/25);
+    ctx.globalAlpha=
+      Math.max(0,t.life/25);
 
     ctx.fillStyle="#ff4b20";
 
     ctx.beginPath();
-    ctx.arc(t.x,t.y,t.size,0,Math.PI*2);
+    ctx.arc(
+      t.x,
+      t.y,
+      t.size,
+      0,
+      Math.PI*2
+    );
     ctx.fill();
 
   });
 
   ctx.globalAlpha=1;
 
-  // Obstacles
+  // Temporary obstacles
   obstacles.forEach(o=>{
 
     ctx.fillStyle="#334c35";
 
-    ctx.fillRect(o.x,0,o.w,o.top);
-    ctx.fillRect(o.x,o.bottom,o.w,H-o.bottom);
+    ctx.fillRect(
+      o.x,
+      0,
+      o.w,
+      o.top
+    );
+
+    ctx.fillRect(
+      o.x,
+      o.bottom,
+      o.w,
+      H-o.bottom
+    );
 
     ctx.fillStyle="#4e6c49";
 
-    ctx.fillRect(o.x-5,o.top-18,o.w+10,18);
-    ctx.fillRect(o.x-5,o.bottom,o.w+10,18);
+    ctx.fillRect(
+      o.x-5,
+      o.top-18,
+      o.w+10,
+      18
+    );
+
+    ctx.fillRect(
+      o.x-5,
+      o.bottom,
+      o.w+10,
+      18
+    );
 
   });
 
-  // Plasma shots
+  // Red plasma
   bullets.forEach(b=>{
 
     ctx.shadowBlur=18;
@@ -473,12 +598,19 @@ function draw(){
     ctx.fillStyle="#fff3df";
 
     ctx.beginPath();
-    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+    ctx.arc(
+      b.x,
+      b.y,
+      b.r,
+      0,
+      Math.PI*2
+    );
     ctx.fill();
 
     ctx.fillStyle="#ff3025";
 
     ctx.beginPath();
+
     ctx.ellipse(
       b.x-9,
       b.y,
@@ -497,13 +629,34 @@ function draw(){
 
   enemies.forEach(drawEnemy);
 
+  // Explosion particles
   particles.forEach(p=>{
 
-    ctx.globalAlpha=Math.max(0,p.life/30);
+    ctx.globalAlpha=
+      Math.max(0,p.life/35);
 
-    ctx.fillStyle="#ff4a2e";
+    if(p.type==="orange"){
+      ctx.fillStyle="#ff9d19";
+    }else{
+      ctx.fillStyle="#ff352e";
+    }
 
-    ctx.fillRect(p.x,p.y,5,5);
+    ctx.shadowBlur=10;
+    ctx.shadowColor=ctx.fillStyle;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      p.x,
+      p.y,
+      p.size||4,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+    ctx.shadowBlur=0;
 
   });
 
@@ -511,13 +664,18 @@ function draw(){
 
   drawRaptor();
 
-  // HUD
+  // ---------- HUD ----------
+
   ctx.textAlign="center";
 
   ctx.fillStyle="#fff";
   ctx.font="bold 30px Arial";
 
-  ctx.fillText(score,W/2,55);
+  ctx.fillText(
+    score,
+    W/2,
+    55
+  );
 
   ctx.font="15px Arial";
 
@@ -529,8 +687,15 @@ function draw(){
 
   if(state==="start"){
 
-    ctx.fillStyle="rgba(0,0,0,.58)";
-    ctx.fillRect(20,H*.24,W-40,275);
+    ctx.fillStyle=
+      "rgba(0,0,0,.58)";
+
+    ctx.fillRect(
+      20,
+      H*.24,
+      W-40,
+      275
+    );
 
     ctx.fillStyle="#fff";
     ctx.font="bold 38px Arial";
@@ -561,7 +726,7 @@ function draw(){
     ctx.font="15px Arial";
 
     ctx.fillText(
-      "Tap to boost + fire plasma",
+      "Destroy the invasion",
       W/2,
       H*.53
     );
@@ -578,8 +743,15 @@ function draw(){
 
   if(state==="dead"){
 
-    ctx.fillStyle="rgba(0,0,0,.65)";
-    ctx.fillRect(25,H*.31,W-50,220);
+    ctx.fillStyle=
+      "rgba(0,0,0,.65)";
+
+    ctx.fillRect(
+      25,
+      H*.31,
+      W-50,
+      220
+    );
 
     ctx.fillStyle="#ff3636";
     ctx.font="bold 34px Arial";
@@ -611,11 +783,20 @@ function draw(){
 
   if(flash>0){
 
-    ctx.fillStyle="rgba(255,30,20,.08)";
-    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=
+      "rgba(255,30,20,.08)";
+
+    ctx.fillRect(
+      0,
+      0,
+      W,
+      H
+    );
 
   }
 }
+
+// ---------- LOOP ----------
 
 function loop(){
 
@@ -628,8 +809,10 @@ function loop(){
 canvas.addEventListener(
   "pointerdown",
   e=>{
+
     e.preventDefault();
     flap();
+
   }
 );
 
