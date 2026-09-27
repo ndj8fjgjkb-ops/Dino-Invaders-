@@ -10,11 +10,10 @@
 <style>
 html,body{
   margin:0;
-  padding:0;
   width:100%;
   height:100%;
   overflow:hidden;
-  background:#08130b;
+  background:#070b0d;
   touch-action:none;
   font-family:Arial,sans-serif;
 }
@@ -34,6 +33,7 @@ const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
 let W,H,dpr;
+
 function resize(){
   dpr=Math.min(devicePixelRatio||1,2);
   W=innerWidth;
@@ -42,35 +42,51 @@ function resize(){
   canvas.height=H*dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
+
 resize();
 addEventListener("resize",resize);
+
+// CYBER RAPTOR ART
+const raptorImg=new Image();
+raptorImg.src="8BBBE99D-BE50-463D-AB99-9356374B034D.png";
 
 let state="start";
 let score=0;
 let high=Number(localStorage.dinoHigh||0);
 let frame=0;
+let flash=0;
+let recoil=0;
 
 const dino={
-  x:70,
+  x:82,
   y:250,
   vy:0,
-  r:22
+
+  // Smaller invisible collision area.
+  // Artwork is intentionally much larger.
+  r:17
 };
 
 let bullets=[];
 let enemies=[];
 let obstacles=[];
 let particles=[];
+let trails=[];
 
 function reset(){
   score=0;
   frame=0;
+  flash=0;
+  recoil=0;
+
   dino.y=H*.45;
   dino.vy=0;
+
   bullets=[];
   enemies=[];
   obstacles=[];
   particles=[];
+  trails=[];
 }
 
 function start(){
@@ -79,64 +95,103 @@ function start(){
 }
 
 function flap(){
-  if(state==="start"||state==="dead"){
+
+  if(state==="start" || state==="dead"){
     start();
     return;
   }
-  dino.vy=-7;
+
+  dino.vy=-7.2;
+
+  // Jet burst
+  for(let i=0;i<5;i++){
+    trails.push({
+      x:dino.x-45,
+      y:dino.y+10,
+      vx:-2-Math.random()*3,
+      vy:(Math.random()-.5)*2,
+      life:18+Math.random()*8,
+      size:3+Math.random()*5
+    });
+  }
+
   shoot();
 }
 
 function shoot(){
+
   bullets.push({
-    x:dino.x+25,
-    y:dino.y,
-    vx:8
+    x:dino.x+55,
+    y:dino.y-5,
+    vx:10,
+    r:5
   });
+
+  recoil=7;
+  flash=3;
+
+  for(let i=0;i<5;i++){
+    particles.push({
+      x:dino.x+54,
+      y:dino.y-5,
+      vx:2+Math.random()*4,
+      vy:(Math.random()-.5)*3,
+      life:15
+    });
+  }
 }
 
 function spawnEnemy(){
+
   enemies.push({
     x:W+40,
     y:70+Math.random()*(H-180),
-    vx:2.5+Math.random()*1.5,
+    vx:2.6+Math.random()*1.6,
     r:18
   });
 }
 
 function spawnObstacle(){
-  let gap=170;
-  let top=70+Math.random()*(H-gap-180);
+
+  const gap=180;
+  const top=70+Math.random()*(H-gap-180);
 
   obstacles.push({
     x:W+40,
     w:55,
-    top:top,
+    top,
     bottom:top+gap,
     passed:false
   });
 }
 
 function hitCircle(a,b){
-  let dx=a.x-b.x;
-  let dy=a.y-b.y;
-  let r=a.r+b.r;
+
+  const dx=a.x-b.x;
+  const dy=a.y-b.y;
+  const r=a.r+b.r;
+
   return dx*dx+dy*dy<r*r;
 }
 
 function explode(x,y){
-  for(let i=0;i<12;i++){
+
+  for(let i=0;i<16;i++){
+
     particles.push({
       x,y,
-      vx:(Math.random()-.5)*6,
-      vy:(Math.random()-.5)*6,
-      life:30
+      vx:(Math.random()-.5)*7,
+      vy:(Math.random()-.5)*7,
+      life:25+Math.random()*15
     });
+
   }
 }
 
 function die(){
-  if(state!=="play")return;
+
+  if(state!=="play") return;
+
   state="dead";
 
   if(score>high){
@@ -148,66 +203,17 @@ function die(){
 }
 
 function update(){
-  if(state!=="play")return;
 
-  frame++;
+  if(recoil>0) recoil*=.72;
+  if(flash>0) flash--;
 
-  dino.vy+=.38;
-  dino.y+=dino.vy;
-
-  if(dino.y<20||dino.y>H-35) die();
-
-  if(frame%105===0) spawnObstacle();
-  if(frame%145===0) spawnEnemy();
-
-  bullets.forEach(b=>b.x+=b.vx);
-  bullets=bullets.filter(b=>b.x<W+30);
-
-  enemies.forEach(e=>e.x-=e.vx);
-
-  obstacles.forEach(o=>{
-    o.x-=2.8;
-
-    if(!o.passed && o.x+o.w<dino.x){
-      o.passed=true;
-      score++;
-    }
-
-    if(
-      dino.x+dino.r>o.x &&
-      dino.x-dino.r<o.x+o.w &&
-      (dino.y-dino.r<o.top ||
-       dino.y+dino.r>o.bottom)
-    ){
-      die();
-    }
+  trails.forEach(t=>{
+    t.x+=t.vx;
+    t.y+=t.vy;
+    t.life--;
   });
 
-  obstacles=obstacles.filter(o=>o.x>-80);
-
-  for(let i=enemies.length-1;i>=0;i--){
-    let e=enemies[i];
-
-    if(hitCircle(dino,e)){
-      die();
-    }
-
-    for(let j=bullets.length-1;j>=0;j--){
-      let b=bullets[j];
-      let dx=b.x-e.x;
-      let dy=b.y-e.y;
-
-      if(dx*dx+dy*dy<e.r*e.r){
-        explode(e.x,e.y);
-        enemies.splice(i,1);
-        bullets.splice(j,1);
-        score+=2;
-        break;
-      }
-    }
-  }
-
-  enemies=enemies.filter(e=>e.x>-50);
+  trails=trails.filter(t=>t.life>0);
 
   particles.forEach(p=>{
     p.x+=p.vx;
@@ -216,78 +222,206 @@ function update(){
   });
 
   particles=particles.filter(p=>p.life>0);
+
+  if(state!=="play") return;
+
+  frame++;
+
+  dino.vy+=.38;
+  dino.y+=dino.vy;
+
+  // Constant subtle engine trail
+  if(frame%3===0){
+
+    trails.push({
+      x:dino.x-43,
+      y:dino.y+10,
+      vx:-2-Math.random()*2,
+      vy:(Math.random()-.5),
+      life:15,
+      size:2+Math.random()*3
+    });
+
+  }
+
+  if(dino.y<20 || dino.y>H-35) die();
+
+  if(frame%105===0) spawnObstacle();
+  if(frame%145===0) spawnEnemy();
+
+  bullets.forEach(b=>b.x+=b.vx);
+
+  bullets=bullets.filter(b=>b.x<W+30);
+
+  enemies.forEach(e=>e.x-=e.vx);
+
+  obstacles.forEach(o=>{
+
+    o.x-=2.8;
+
+    if(!o.passed && o.x+o.w<dino.x){
+
+      o.passed=true;
+      score++;
+
+    }
+
+    if(
+      dino.x+dino.r>o.x &&
+      dino.x-dino.r<o.x+o.w &&
+      (
+        dino.y-dino.r<o.top ||
+        dino.y+dino.r>o.bottom
+      )
+    ){
+      die();
+    }
+
+  });
+
+  obstacles=obstacles.filter(o=>o.x>-80);
+
+  for(let i=enemies.length-1;i>=0;i--){
+
+    const e=enemies[i];
+
+    if(hitCircle(dino,e)){
+      die();
+    }
+
+    for(let j=bullets.length-1;j>=0;j--){
+
+      const b=bullets[j];
+
+      const dx=b.x-e.x;
+      const dy=b.y-e.y;
+
+      if(dx*dx+dy*dy<(e.r+b.r)*(e.r+b.r)){
+
+        explode(e.x,e.y);
+
+        enemies.splice(i,1);
+        bullets.splice(j,1);
+
+        score+=2;
+
+        break;
+      }
+    }
+  }
+
+  enemies=enemies.filter(e=>e.x>-50);
 }
 
 function background(){
-  let g=ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,"#07152a");
-  g.addColorStop(.55,"#214d45");
-  g.addColorStop(1,"#18321d");
+
+  const g=ctx.createLinearGradient(0,0,0,H);
+
+  g.addColorStop(0,"#071018");
+  g.addColorStop(.55,"#182d2c");
+  g.addColorStop(1,"#131b15");
 
   ctx.fillStyle=g;
   ctx.fillRect(0,0,W,H);
 
-  ctx.fillStyle="#132a1a";
+  // Moon
+  ctx.fillStyle="rgba(230,240,255,.12)";
+  ctx.beginPath();
+  ctx.arc(W*.78,H*.18,65,0,Math.PI*2);
+  ctx.fill();
 
-  for(let i=0;i<W;i+=90){
-    let h=70+((i*7)%80);
+  // Distant mountains
+  ctx.fillStyle="#101c1b";
+
+  for(let i=-50;i<W+100;i+=100){
+
+    const h=80+((i*7)%70);
 
     ctx.beginPath();
     ctx.moveTo(i,H);
-    ctx.lineTo(i+45,H-h);
-    ctx.lineTo(i+90,H);
+    ctx.lineTo(i+50,H-h);
+    ctx.lineTo(i+100,H);
     ctx.fill();
+
   }
 
-  ctx.fillStyle="#0b2011";
+  ctx.fillStyle="#08130c";
   ctx.fillRect(0,H-30,W,30);
 }
 
-function drawDino(){
+function drawRaptor(){
+
   ctx.save();
-  ctx.translate(dino.x,dino.y);
 
-  ctx.fillStyle="#7cff59";
+  ctx.translate(
+    dino.x-recoil,
+    dino.y
+  );
 
+  // Slight nose-up/nose-down rotation based on velocity
+  const angle=Math.max(-.18,Math.min(.22,dino.vy*.025));
+
+  ctx.rotate(angle);
+
+  // Red engine glow
+  const glow=ctx.createRadialGradient(
+    -42,8,2,
+    -42,8,42
+  );
+
+  glow.addColorStop(0,"rgba(255,60,25,.8)");
+  glow.addColorStop(1,"rgba(255,20,0,0)");
+
+  ctx.fillStyle=glow;
   ctx.beginPath();
-  ctx.arc(0,0,20,0,Math.PI*2);
+  ctx.arc(-42,8,42,0,Math.PI*2);
   ctx.fill();
 
-  ctx.fillRect(10,-15,24,18);
+  // Character art
+  if(raptorImg.complete && raptorImg.naturalWidth){
 
-  ctx.fillStyle="#fff";
-  ctx.beginPath();
-  ctx.arc(25,-9,5,0,Math.PI*2);
-  ctx.fill();
+    const drawW=155;
+    const ratio=raptorImg.naturalHeight/raptorImg.naturalWidth;
+    const drawH=drawW*ratio;
 
-  ctx.fillStyle="#111";
-  ctx.beginPath();
-  ctx.arc(27,-9,2,0,Math.PI*2);
-  ctx.fill();
+    ctx.drawImage(
+      raptorImg,
+      -drawW*.47,
+      -drawH*.50,
+      drawW,
+      drawH
+    );
 
-  ctx.fillStyle="#7cff59";
-  ctx.beginPath();
-  ctx.moveTo(-18,5);
-  ctx.lineTo(-42,15);
-  ctx.lineTo(-18,-6);
-  ctx.fill();
+  } else {
+
+    // Backup while image loads
+    ctx.fillStyle="#d9d9d9";
+    ctx.beginPath();
+    ctx.arc(0,0,20,0,Math.PI*2);
+    ctx.fill();
+
+  }
 
   ctx.restore();
 }
 
 function drawEnemy(e){
+
   ctx.save();
+
   ctx.translate(e.x,e.y);
 
-  ctx.fillStyle="#ff4f70";
+  ctx.fillStyle="#a70f22";
+
   ctx.beginPath();
   ctx.arc(0,0,e.r,0,Math.PI*2);
   ctx.fill();
 
-  ctx.fillStyle="#ffd75a";
-  ctx.fillRect(-22,-5,44,10);
+  ctx.fillStyle="#ff3a35";
+  ctx.fillRect(-23,-5,46,10);
 
   ctx.fillStyle="#fff";
+
   ctx.beginPath();
   ctx.arc(-6,-3,4,0,Math.PI*2);
   ctx.arc(6,-3,4,0,Math.PI*2);
@@ -297,95 +431,207 @@ function drawEnemy(e){
 }
 
 function draw(){
+
   background();
 
+  // Jet trails
+  trails.forEach(t=>{
+
+    ctx.globalAlpha=Math.max(0,t.life/25);
+
+    ctx.fillStyle="#ff4b20";
+
+    ctx.beginPath();
+    ctx.arc(t.x,t.y,t.size,0,Math.PI*2);
+    ctx.fill();
+
+  });
+
+  ctx.globalAlpha=1;
+
+  // Obstacles
   obstacles.forEach(o=>{
-    ctx.fillStyle="#477d32";
+
+    ctx.fillStyle="#334c35";
 
     ctx.fillRect(o.x,0,o.w,o.top);
     ctx.fillRect(o.x,o.bottom,o.w,H-o.bottom);
 
-    ctx.fillStyle="#65a844";
+    ctx.fillStyle="#4e6c49";
+
     ctx.fillRect(o.x-5,o.top-18,o.w+10,18);
     ctx.fillRect(o.x-5,o.bottom,o.w+10,18);
+
   });
 
+  // Plasma shots
   bullets.forEach(b=>{
-    ctx.fillStyle="#ffe95e";
+
+    ctx.shadowBlur=18;
+    ctx.shadowColor="#ff2020";
+
+    ctx.fillStyle="#fff3df";
+
     ctx.beginPath();
-    ctx.arc(b.x,b.y,5,0,Math.PI*2);
+    ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
     ctx.fill();
+
+    ctx.fillStyle="#ff3025";
+
+    ctx.beginPath();
+    ctx.ellipse(
+      b.x-9,
+      b.y,
+      13,
+      3,
+      0,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+    ctx.shadowBlur=0;
+
   });
 
   enemies.forEach(drawEnemy);
 
   particles.forEach(p=>{
-    ctx.globalAlpha=p.life/30;
-    ctx.fillStyle="#ffd34d";
+
+    ctx.globalAlpha=Math.max(0,p.life/30);
+
+    ctx.fillStyle="#ff4a2e";
+
     ctx.fillRect(p.x,p.y,5,5);
+
   });
 
   ctx.globalAlpha=1;
 
-  drawDino();
+  drawRaptor();
 
+  // HUD
   ctx.textAlign="center";
 
   ctx.fillStyle="#fff";
   ctx.font="bold 30px Arial";
+
   ctx.fillText(score,W/2,55);
 
   ctx.font="15px Arial";
-  ctx.fillText("BEST "+high,W/2,78);
+
+  ctx.fillText(
+    "BEST "+high,
+    W/2,
+    78
+  );
 
   if(state==="start"){
-    ctx.fillStyle="rgba(0,0,0,.45)";
-    ctx.fillRect(20,H*.25,W-40,260);
+
+    ctx.fillStyle="rgba(0,0,0,.58)";
+    ctx.fillRect(20,H*.24,W-40,275);
 
     ctx.fillStyle="#fff";
     ctx.font="bold 38px Arial";
-    ctx.fillText("DINO",W/2,H*.34);
 
-    ctx.fillStyle="#7cff59";
-    ctx.fillText("INVADERS",W/2,H*.40);
+    ctx.fillText(
+      "DINO",
+      W/2,
+      H*.33
+    );
+
+    ctx.fillStyle="#ff3030";
+
+    ctx.fillText(
+      "INVADERS",
+      W/2,
+      H*.39
+    );
 
     ctx.fillStyle="#fff";
     ctx.font="20px Arial";
-    ctx.fillText("TAP TO FLY + FIRE",W/2,H*.50);
+
+    ctx.fillText(
+      "CYBER RAPTOR ONLINE",
+      W/2,
+      H*.48
+    );
 
     ctx.font="15px Arial";
-    ctx.fillText("Dodge the jungle. Blast the invaders.",W/2,H*.55);
+
+    ctx.fillText(
+      "Tap to boost + fire plasma",
+      W/2,
+      H*.53
+    );
 
     ctx.font="bold 22px Arial";
-    ctx.fillText("TAP TO START",W/2,H*.64);
+
+    ctx.fillText(
+      "TAP TO START",
+      W/2,
+      H*.63
+    );
+
   }
 
   if(state==="dead"){
-    ctx.fillStyle="rgba(0,0,0,.58)";
+
+    ctx.fillStyle="rgba(0,0,0,.65)";
     ctx.fillRect(25,H*.31,W-50,220);
 
-    ctx.fillStyle="#fff";
+    ctx.fillStyle="#ff3636";
     ctx.font="bold 34px Arial";
-    ctx.fillText("EXTINCT!",W/2,H*.40);
 
+    ctx.fillText(
+      "SYSTEM DOWN",
+      W/2,
+      H*.40
+    );
+
+    ctx.fillStyle="#fff";
     ctx.font="22px Arial";
-    ctx.fillText("Score: "+score,W/2,H*.47);
+
+    ctx.fillText(
+      "Score: "+score,
+      W/2,
+      H*.47
+    );
 
     ctx.font="bold 20px Arial";
-    ctx.fillText("TAP TO TRY AGAIN",W/2,H*.56);
+
+    ctx.fillText(
+      "TAP TO REBOOT",
+      W/2,
+      H*.56
+    );
+
+  }
+
+  if(flash>0){
+
+    ctx.fillStyle="rgba(255,30,20,.08)";
+    ctx.fillRect(0,0,W,H);
+
   }
 }
 
 function loop(){
+
   update();
   draw();
+
   requestAnimationFrame(loop);
 }
 
-canvas.addEventListener("pointerdown",e=>{
-  e.preventDefault();
-  flap();
-});
+canvas.addEventListener(
+  "pointerdown",
+  e=>{
+    e.preventDefault();
+    flap();
+  }
+);
 
 loop();
 </script>
