@@ -13,7 +13,7 @@ html,body{
   width:100%;
   height:100%;
   overflow:hidden;
-  background:#070b0d;
+  background:#88a6ac;
   touch-action:none;
   font-family:Arial,sans-serif;
 }
@@ -46,7 +46,10 @@ function resize(){
 resize();
 addEventListener("resize",resize);
 
-// ---------- ART ----------
+
+// =====================================
+// ART
+// =====================================
 
 const raptorImg=new Image();
 raptorImg.src="8BBBE99D-BE50-463D-AB99-9356374B034D.png";
@@ -54,12 +57,19 @@ raptorImg.src="8BBBE99D-BE50-463D-AB99-9356374B034D.png";
 const enemyImg=new Image();
 enemyImg.src="223E8F5F-AC53-4AC9-9DAE-CCF47D50F608.png";
 
-// ---------- GAME ----------
+const ruinImg=new Image();
+ruinImg.src="5080889A-A0A6-480F-9940-CAE4F6A11FBF.png";
+
+
+// =====================================
+// GAME STATE
+// =====================================
 
 let state="start";
 let score=0;
 let high=Number(localStorage.dinoHigh||0);
 let frame=0;
+let worldX=0;
 let flash=0;
 let recoil=0;
 
@@ -76,9 +86,16 @@ let obstacles=[];
 let particles=[];
 let trails=[];
 
+
+// =====================================
+// RESET
+// =====================================
+
 function reset(){
+
   score=0;
   frame=0;
+  worldX=0;
   flash=0;
   recoil=0;
 
@@ -97,6 +114,11 @@ function start(){
   state="play";
 }
 
+
+// =====================================
+// PLAYER
+// =====================================
+
 function flap(){
 
   if(state==="start" || state==="dead"){
@@ -106,15 +128,17 @@ function flap(){
 
   dino.vy=-7.2;
 
-  for(let i=0;i<5;i++){
+  for(let i=0;i<6;i++){
+
     trails.push({
       x:dino.x-45,
       y:dino.y+10,
       vx:-2-Math.random()*3,
       vy:(Math.random()-.5)*2,
-      life:18+Math.random()*8,
+      life:20+Math.random()*8,
       size:3+Math.random()*5
     });
+
   }
 
   shoot();
@@ -133,46 +157,97 @@ function shoot(){
   flash=3;
 
   for(let i=0;i<5;i++){
+
     particles.push({
       x:dino.x+54,
       y:dino.y-5,
       vx:2+Math.random()*4,
       vy:(Math.random()-.5)*3,
       life:15,
+      size:3,
       type:"red"
     });
+
   }
 }
 
-// ---------- ENEMIES ----------
+
+// =====================================
+// SPAWNING
+// =====================================
 
 function spawnEnemy(){
 
   enemies.push({
+
     x:W+80,
-    baseY:80+Math.random()*(H-190),
+
+    baseY:
+      85+
+      Math.random()*
+      Math.max(80,H-210),
+
     y:0,
-    vx:2.7+Math.random()*1.3,
+
+    vx:
+      2.7+
+      Math.random()*1.3,
+
     r:20,
-    phase:Math.random()*Math.PI*2,
-    bob:10+Math.random()*13
+
+    phase:
+      Math.random()*
+      Math.PI*2,
+
+    bob:
+      10+
+      Math.random()*13
   });
 
 }
 
 function spawnObstacle(){
 
-  const gap=180;
-  const top=70+Math.random()*(H-gap-180);
+  const gap=190;
+
+  const margin=85;
+
+  const minCenter=
+    margin+
+    gap/2;
+
+  const maxCenter=
+    H-
+    margin-
+    gap/2;
+
+  const center=
+    minCenter+
+    Math.random()*
+    Math.max(
+      1,
+      maxCenter-minCenter
+    );
 
   obstacles.push({
-    x:W+40,
-    w:55,
-    top,
-    bottom:top+gap,
+
+    x:W+90,
+
+    w:92,
+
+    top:center-gap/2,
+
+    bottom:center+gap/2,
+
     passed:false
   });
+
 }
+
+
+// =====================================
+// COLLISIONS
+// =====================================
 
 function hitCircle(a,b){
 
@@ -180,7 +255,11 @@ function hitCircle(a,b){
   const dy=a.y-b.y;
   const r=a.r+b.r;
 
-  return dx*dx+dy*dy<r*r;
+  return(
+    dx*dx+
+    dy*dy<
+    r*r
+  );
 }
 
 function explode(x,y,type="orange"){
@@ -188,12 +267,24 @@ function explode(x,y,type="orange"){
   for(let i=0;i<20;i++){
 
     particles.push({
+
       x,
       y,
-      vx:(Math.random()-.5)*8,
-      vy:(Math.random()-.5)*8,
-      life:25+Math.random()*18,
-      size:3+Math.random()*5,
+
+      vx:
+        (Math.random()-.5)*8,
+
+      vy:
+        (Math.random()-.5)*8,
+
+      life:
+        25+
+        Math.random()*18,
+
+      size:
+        3+
+        Math.random()*5,
+
       type
     });
 
@@ -207,121 +298,218 @@ function die(){
   state="dead";
 
   if(score>high){
+
     high=score;
     localStorage.dinoHigh=high;
+
   }
 
-  explode(dino.x,dino.y,"red");
+  explode(
+    dino.x,
+    dino.y,
+    "red"
+  );
 }
 
-// ---------- UPDATE ----------
+
+// =====================================
+// UPDATE
+// =====================================
 
 function update(){
 
-  if(recoil>0) recoil*=.72;
-  if(flash>0) flash--;
+  if(recoil>0){
+    recoil*=.72;
+  }
+
+  if(flash>0){
+    flash--;
+  }
 
   trails.forEach(t=>{
+
     t.x+=t.vx;
     t.y+=t.vy;
     t.life--;
+
   });
 
-  trails=trails.filter(t=>t.life>0);
+  trails=
+    trails.filter(
+      t=>t.life>0
+    );
 
   particles.forEach(p=>{
+
     p.x+=p.vx;
     p.y+=p.vy;
     p.life--;
+
   });
 
-  particles=particles.filter(p=>p.life>0);
+  particles=
+    particles.filter(
+      p=>p.life>0
+    );
 
   if(state!=="play") return;
 
   frame++;
+  worldX+=2.8;
 
   dino.vy+=.38;
   dino.y+=dino.vy;
 
+
+  // engine trail
+
   if(frame%3===0){
 
     trails.push({
+
       x:dino.x-43,
       y:dino.y+10,
-      vx:-2-Math.random()*2,
-      vy:(Math.random()-.5),
+
+      vx:
+        -2-
+        Math.random()*2,
+
+      vy:
+        (Math.random()-.5),
+
       life:15,
-      size:2+Math.random()*3
+
+      size:
+        2+
+        Math.random()*3
+
     });
 
   }
 
-  if(dino.y<20 || dino.y>H-35){
+
+  if(
+    dino.y<20 ||
+    dino.y>H-35
+  ){
     die();
   }
 
-  if(frame%105===0){
+
+  // Ruins
+
+  if(frame%110===0){
     spawnObstacle();
   }
 
-  if(frame%135===0){
+
+  // Enemy drones
+
+  if(frame%138===0){
     spawnEnemy();
   }
 
-  bullets.forEach(b=>{
-    b.x+=b.vx;
-  });
 
-  bullets=bullets.filter(b=>b.x<W+30);
+  // Plasma
 
-  // Flying enemies bob up and down
+  bullets.forEach(
+    b=>b.x+=b.vx
+  );
+
+  bullets=
+    bullets.filter(
+      b=>b.x<W+40
+    );
+
+
+  // Enemy movement
+
   enemies.forEach(e=>{
 
     e.x-=e.vx;
 
     e.y=
       e.baseY+
-      Math.sin(frame*.055+e.phase)*e.bob;
+      Math.sin(
+        frame*.055+
+        e.phase
+      )*
+      e.bob;
 
   });
+
+
+  // Ruin movement + collision
 
   obstacles.forEach(o=>{
 
     o.x-=2.8;
 
-    if(!o.passed && o.x+o.w<dino.x){
+
+    if(
+      !o.passed &&
+      o.x+o.w<dino.x
+    ){
 
       o.passed=true;
       score++;
 
     }
 
+
     if(
+
       dino.x+dino.r>o.x &&
-      dino.x-dino.r<o.x+o.w &&
+
+      dino.x-dino.r<
+      o.x+o.w &&
+
       (
-        dino.y-dino.r<o.top ||
-        dino.y+dino.r>o.bottom
+
+        dino.y-dino.r<
+        o.top ||
+
+        dino.y+dino.r>
+        o.bottom
+
       )
+
     ){
+
       die();
+
     }
 
   });
 
-  obstacles=obstacles.filter(o=>o.x>-80);
 
-  // Enemy collisions
-  for(let i=enemies.length-1;i>=0;i--){
+  obstacles=
+    obstacles.filter(
+      o=>o.x>-130
+    );
+
+
+  // Enemy collision
+
+  for(
+    let i=enemies.length-1;
+    i>=0;
+    i--
+  ){
 
     const e=enemies[i];
+
 
     if(hitCircle(dino,e)){
       die();
     }
 
-    for(let j=bullets.length-1;j>=0;j--){
+
+    for(
+      let j=bullets.length-1;
+      j>=0;
+      j--
+    ){
 
       const b=bullets[j];
 
@@ -329,12 +517,20 @@ function update(){
       const dy=b.y-e.y;
 
       if(
-        dx*dx+dy*dy <
-        (e.r+b.r)*(e.r+b.r)
+
+        dx*dx+
+        dy*dy<
+
+        (e.r+b.r)*
+        (e.r+b.r)
+
       ){
 
-        // Orange enemy destruction
-        explode(e.x,e.y,"orange");
+        explode(
+          e.x,
+          e.y,
+          "orange"
+        );
 
         enemies.splice(i,1);
         bullets.splice(j,1);
@@ -343,51 +539,445 @@ function update(){
 
         break;
       }
+
     }
+
   }
 
-  enemies=enemies.filter(e=>e.x>-100);
+
+  enemies=
+    enemies.filter(
+      e=>e.x>-120
+    );
 }
 
-// ---------- BACKGROUND ----------
 
-function background(){
+// =====================================
+// V5 PARALLAX WORLD
+// =====================================
 
-  const g=ctx.createLinearGradient(0,0,0,H);
+function drawSky(){
 
-  g.addColorStop(0,"#071018");
-  g.addColorStop(.55,"#182d2c");
-  g.addColorStop(1,"#131b15");
+  const g=
+    ctx.createLinearGradient(
+      0,0,
+      0,H
+    );
+
+  // Warm daylight,
+  // but not excessively bright.
+
+  g.addColorStop(
+    0,
+    "#6f95aa"
+  );
+
+  g.addColorStop(
+    .42,
+    "#9eb5b2"
+  );
+
+  g.addColorStop(
+    .72,
+    "#c5a879"
+  );
+
+  g.addColorStop(
+    1,
+    "#526f55"
+  );
 
   ctx.fillStyle=g;
-  ctx.fillRect(0,0,W,H);
 
-  // Moon
-  ctx.fillStyle="rgba(230,240,255,.12)";
+  ctx.fillRect(
+    0,0,W,H
+  );
+
+
+  // Warm sun glow
+
+  const sunX=W*.18;
+  const sunY=H*.20;
+
+  const sun=
+    ctx.createRadialGradient(
+      sunX,
+      sunY,
+      5,
+      sunX,
+      sunY,
+      130
+    );
+
+  sun.addColorStop(
+    0,
+    "rgba(255,235,180,.55)"
+  );
+
+  sun.addColorStop(
+    1,
+    "rgba(255,220,150,0)"
+  );
+
+  ctx.fillStyle=sun;
+
   ctx.beginPath();
-  ctx.arc(W*.78,H*.18,65,0,Math.PI*2);
+
+  ctx.arc(
+    sunX,
+    sunY,
+    130,
+    0,
+    Math.PI*2
+  );
+
   ctx.fill();
 
-  // Distant mountains
-  ctx.fillStyle="#101c1b";
+}
 
-  for(let i=-50;i<W+100;i+=100){
 
-    const h=80+((i*7)%70);
+// =====================================
+// DISTANT MOUNTAINS
+// =====================================
+
+function drawMountains(){
+
+  const offset=
+    -(worldX*.12)%220;
+
+  ctx.fillStyle=
+    "rgba(58,82,77,.50)";
+
+  for(
+    let x=offset-220;
+    x<W+220;
+    x+=220
+  ){
 
     ctx.beginPath();
-    ctx.moveTo(i,H);
-    ctx.lineTo(i+50,H-h);
-    ctx.lineTo(i+100,H);
+
+    ctx.moveTo(
+      x,
+      H*.72
+    );
+
+    ctx.lineTo(
+      x+110,
+      H*.31
+    );
+
+    ctx.lineTo(
+      x+220,
+      H*.72
+    );
+
+    ctx.closePath();
     ctx.fill();
 
   }
 
-  ctx.fillStyle="#08130c";
-  ctx.fillRect(0,H-30,W,30);
+
+  // Mist layer
+
+  ctx.fillStyle=
+    "rgba(225,235,220,.16)";
+
+  ctx.fillRect(
+    0,
+    H*.57,
+    W,
+    H*.18
+  );
+
 }
 
-// ---------- CYBER RAPTOR ----------
+
+// =====================================
+// MIDGROUND CLIFFS
+// =====================================
+
+function drawCliffs(){
+
+  const offset=
+    -(worldX*.32)%180;
+
+  ctx.fillStyle=
+    "#3c5945";
+
+  for(
+    let x=offset-180;
+    x<W+180;
+    x+=180
+  ){
+
+    const peak=
+      60+
+      ((Math.abs(x)*7)%80);
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      x,
+      H
+    );
+
+    ctx.lineTo(
+      x+40,
+      H-peak
+    );
+
+    ctx.lineTo(
+      x+95,
+      H-peak-35
+    );
+
+    ctx.lineTo(
+      x+140,
+      H-peak+20
+    );
+
+    ctx.lineTo(
+      x+180,
+      H
+    );
+
+    ctx.closePath();
+
+    ctx.fill();
+
+  }
+
+}
+
+
+// =====================================
+// WATERFALLS
+// =====================================
+
+function drawWaterfalls(){
+
+  const offset=
+    -(worldX*.32)%360;
+
+  for(
+    let x=offset;
+    x<W+360;
+    x+=360
+  ){
+
+    const wx=x+115;
+
+    const grad=
+      ctx.createLinearGradient(
+        wx,
+        H*.58,
+        wx,
+        H
+      );
+
+    grad.addColorStop(
+      0,
+      "rgba(190,225,225,.55)"
+    );
+
+    grad.addColorStop(
+      1,
+      "rgba(190,225,225,0)"
+    );
+
+    ctx.fillStyle=grad;
+
+    ctx.fillRect(
+      wx,
+      H*.58,
+      18,
+      H*.34
+    );
+
+  }
+
+}
+
+
+// =====================================
+// FOREGROUND JUNGLE
+// =====================================
+
+function drawJungle(){
+
+  const offset=
+    -(worldX*.72)%80;
+
+  ctx.fillStyle=
+    "#183a29";
+
+  for(
+    let x=offset-80;
+    x<W+80;
+    x+=80
+  ){
+
+    ctx.beginPath();
+
+    ctx.arc(
+      x,
+      H-22,
+      52,
+      Math.PI,
+      0
+    );
+
+    ctx.fill();
+
+  }
+
+
+  ctx.fillStyle=
+    "#102a20";
+
+  ctx.fillRect(
+    0,
+    H-25,
+    W,
+    25
+  );
+
+}
+
+
+// =====================================
+// RUIN OBSTACLE
+// =====================================
+
+function drawRuin(o){
+
+  if(
+    !ruinImg.complete ||
+    !ruinImg.naturalWidth
+  ){
+
+    // Temporary backup
+    ctx.fillStyle="#6d765b";
+
+    ctx.fillRect(
+      o.x,
+      0,
+      o.w,
+      o.top
+    );
+
+    ctx.fillRect(
+      o.x,
+      o.bottom,
+      o.w,
+      H-o.bottom
+    );
+
+    return;
+  }
+
+
+  /*
+    Our ruin image contains
+    a TOP ruin and BOTTOM ruin.
+
+    We crop the image into
+    two halves and position
+    them around the gameplay gap.
+  */
+
+  const iw=
+    ruinImg.naturalWidth;
+
+  const ih=
+    ruinImg.naturalHeight;
+
+  const half=
+    ih/2;
+
+
+  // ---------- TOP RUIN ----------
+
+  const topHeight=
+    Math.max(
+      120,
+      o.top+65
+    );
+
+  ctx.drawImage(
+
+    ruinImg,
+
+    0,
+    0,
+    iw,
+    half,
+
+    o.x-32,
+    o.top-topHeight+30,
+
+    o.w+64,
+    topHeight
+
+  );
+
+
+  // ---------- BOTTOM RUIN ----------
+
+  const bottomHeight=
+    Math.max(
+      150,
+      H-o.bottom+80
+    );
+
+  ctx.drawImage(
+
+    ruinImg,
+
+    0,
+    half,
+    iw,
+    half,
+
+    o.x-34,
+    o.bottom-25,
+
+    o.w+68,
+    bottomHeight
+
+  );
+
+
+  // Blue alien glow at edges
+
+  ctx.shadowBlur=15;
+  ctx.shadowColor="#45d9ff";
+
+  ctx.fillStyle=
+    "rgba(70,220,255,.25)";
+
+  ctx.fillRect(
+    o.x+o.w*.45,
+    o.top-3,
+    4,
+    12
+  );
+
+  ctx.fillRect(
+    o.x+o.w*.45,
+    o.bottom-9,
+    4,
+    12
+  );
+
+  ctx.shadowBlur=0;
+
+}
+
+
+// =====================================
+// CYBER RAPTOR
+// =====================================
 
 function drawRaptor(){
 
@@ -401,12 +991,17 @@ function drawRaptor(){
   const angle=
     Math.max(
       -.18,
-      Math.min(.22,dino.vy*.025)
+      Math.min(
+        .22,
+        dino.vy*.025
+      )
     );
 
   ctx.rotate(angle);
 
-  // Red jet glow
+
+  // Red engine glow
+
   const glow=
     ctx.createRadialGradient(
       -42,8,2,
@@ -426,8 +1021,17 @@ function drawRaptor(){
   ctx.fillStyle=glow;
 
   ctx.beginPath();
-  ctx.arc(-42,8,42,0,Math.PI*2);
+
+  ctx.arc(
+    -42,
+    8,
+    42,
+    0,
+    Math.PI*2
+  );
+
   ctx.fill();
+
 
   if(
     raptorImg.complete &&
@@ -440,7 +1044,8 @@ function drawRaptor(){
       raptorImg.naturalHeight/
       raptorImg.naturalWidth;
 
-    const drawH=drawW*ratio;
+    const drawH=
+      drawW*ratio;
 
     ctx.drawImage(
       raptorImg,
@@ -455,18 +1060,23 @@ function drawRaptor(){
   ctx.restore();
 }
 
-// ---------- ORANGE RAPTOR DRONE ----------
+
+// =====================================
+// ORANGE ENEMY
+// =====================================
 
 function drawEnemy(e){
 
   ctx.save();
 
-  ctx.translate(e.x,e.y);
+  ctx.translate(
+    e.x,
+    e.y
+  );
 
-  // Enemy faces LEFT toward player
   ctx.scale(-1,1);
 
-  // Orange energy aura
+
   const glow=
     ctx.createRadialGradient(
       0,0,5,
@@ -486,8 +1096,17 @@ function drawEnemy(e){
   ctx.fillStyle=glow;
 
   ctx.beginPath();
-  ctx.arc(0,0,48,0,Math.PI*2);
+
+  ctx.arc(
+    0,
+    0,
+    48,
+    0,
+    Math.PI*2
+  );
+
   ctx.fill();
+
 
   if(
     enemyImg.complete &&
@@ -500,7 +1119,8 @@ function drawEnemy(e){
       enemyImg.naturalHeight/
       enemyImg.naturalWidth;
 
-    const drawH=drawW*ratio;
+    const drawH=
+      drawW*ratio;
 
     ctx.drawImage(
       enemyImg,
@@ -510,35 +1130,39 @@ function drawEnemy(e){
       drawH
     );
 
-  }else{
-
-    // Backup while image loads
-    ctx.fillStyle="#ff9500";
-
-    ctx.beginPath();
-    ctx.arc(0,0,20,0,Math.PI*2);
-    ctx.fill();
-
   }
 
   ctx.restore();
 }
 
-// ---------- DRAW ----------
+
+// =====================================
+// MAIN DRAW
+// =====================================
 
 function draw(){
 
-  background();
+  drawSky();
+  drawMountains();
+  drawCliffs();
+  drawWaterfalls();
 
-  // Cyber Raptor engine trails
+
+  // Engine trails
+
   trails.forEach(t=>{
 
     ctx.globalAlpha=
-      Math.max(0,t.life/25);
+      Math.max(
+        0,
+        t.life/25
+      );
 
-    ctx.fillStyle="#ff4b20";
+    ctx.fillStyle=
+      "#ff4b20";
 
     ctx.beginPath();
+
     ctx.arc(
       t.x,
       t.y,
@@ -546,50 +1170,23 @@ function draw(){
       0,
       Math.PI*2
     );
+
     ctx.fill();
 
   });
 
   ctx.globalAlpha=1;
 
-  // Temporary obstacles
-  obstacles.forEach(o=>{
 
-    ctx.fillStyle="#334c35";
+  // Ruins replace pipes
 
-    ctx.fillRect(
-      o.x,
-      0,
-      o.w,
-      o.top
-    );
+  obstacles.forEach(
+    drawRuin
+  );
 
-    ctx.fillRect(
-      o.x,
-      o.bottom,
-      o.w,
-      H-o.bottom
-    );
 
-    ctx.fillStyle="#4e6c49";
+  // Plasma
 
-    ctx.fillRect(
-      o.x-5,
-      o.top-18,
-      o.w+10,
-      18
-    );
-
-    ctx.fillRect(
-      o.x-5,
-      o.bottom,
-      o.w+10,
-      18
-    );
-
-  });
-
-  // Red plasma
   bullets.forEach(b=>{
 
     ctx.shadowBlur=18;
@@ -598,6 +1195,7 @@ function draw(){
     ctx.fillStyle="#fff3df";
 
     ctx.beginPath();
+
     ctx.arc(
       b.x,
       b.y,
@@ -605,7 +1203,9 @@ function draw(){
       0,
       Math.PI*2
     );
+
     ctx.fill();
+
 
     ctx.fillStyle="#ff3025";
 
@@ -627,22 +1227,30 @@ function draw(){
 
   });
 
-  enemies.forEach(drawEnemy);
+
+  enemies.forEach(
+    drawEnemy
+  );
+
 
   // Explosion particles
+
   particles.forEach(p=>{
 
     ctx.globalAlpha=
-      Math.max(0,p.life/35);
+      Math.max(
+        0,
+        p.life/35
+      );
 
-    if(p.type==="orange"){
-      ctx.fillStyle="#ff9d19";
-    }else{
-      ctx.fillStyle="#ff352e";
-    }
+    ctx.fillStyle=
+      p.type==="orange"
+      ? "#ff9d19"
+      : "#ff352e";
 
     ctx.shadowBlur=10;
-    ctx.shadowColor=ctx.fillStyle;
+    ctx.shadowColor=
+      ctx.fillStyle;
 
     ctx.beginPath();
 
@@ -662,14 +1270,26 @@ function draw(){
 
   ctx.globalAlpha=1;
 
+
   drawRaptor();
 
-  // ---------- HUD ----------
+  drawJungle();
+
+
+  // =================================
+  // HUD
+  // =================================
 
   ctx.textAlign="center";
 
+  ctx.shadowBlur=5;
+  ctx.shadowColor=
+    "rgba(0,0,0,.6)";
+
   ctx.fillStyle="#fff";
-  ctx.font="bold 30px Arial";
+
+  ctx.font=
+    "bold 30px Arial";
 
   ctx.fillText(
     score,
@@ -677,7 +1297,8 @@ function draw(){
     55
   );
 
-  ctx.font="15px Arial";
+  ctx.font=
+    "15px Arial";
 
   ctx.fillText(
     "BEST "+high,
@@ -685,10 +1306,15 @@ function draw(){
     78
   );
 
+  ctx.shadowBlur=0;
+
+
+  // START
+
   if(state==="start"){
 
     ctx.fillStyle=
-      "rgba(0,0,0,.58)";
+      "rgba(10,20,18,.66)";
 
     ctx.fillRect(
       20,
@@ -697,14 +1323,18 @@ function draw(){
       275
     );
 
+
     ctx.fillStyle="#fff";
-    ctx.font="bold 38px Arial";
+
+    ctx.font=
+      "bold 38px Arial";
 
     ctx.fillText(
       "DINO",
       W/2,
       H*.33
     );
+
 
     ctx.fillStyle="#ff3030";
 
@@ -714,8 +1344,11 @@ function draw(){
       H*.39
     );
 
+
     ctx.fillStyle="#fff";
-    ctx.font="20px Arial";
+
+    ctx.font=
+      "20px Arial";
 
     ctx.fillText(
       "CYBER RAPTOR ONLINE",
@@ -723,15 +1356,19 @@ function draw(){
       H*.48
     );
 
-    ctx.font="15px Arial";
+
+    ctx.font=
+      "15px Arial";
 
     ctx.fillText(
-      "Destroy the invasion",
+      "Fly the ruins. Destroy the invasion.",
       W/2,
       H*.53
     );
 
-    ctx.font="bold 22px Arial";
+
+    ctx.font=
+      "bold 22px Arial";
 
     ctx.fillText(
       "TAP TO START",
@@ -741,10 +1378,13 @@ function draw(){
 
   }
 
+
+  // GAME OVER
+
   if(state==="dead"){
 
     ctx.fillStyle=
-      "rgba(0,0,0,.65)";
+      "rgba(10,20,18,.72)";
 
     ctx.fillRect(
       25,
@@ -753,8 +1393,11 @@ function draw(){
       220
     );
 
+
     ctx.fillStyle="#ff3636";
-    ctx.font="bold 34px Arial";
+
+    ctx.font=
+      "bold 34px Arial";
 
     ctx.fillText(
       "SYSTEM DOWN",
@@ -762,8 +1405,11 @@ function draw(){
       H*.40
     );
 
+
     ctx.fillStyle="#fff";
-    ctx.font="22px Arial";
+
+    ctx.font=
+      "22px Arial";
 
     ctx.fillText(
       "Score: "+score,
@@ -771,7 +1417,9 @@ function draw(){
       H*.47
     );
 
-    ctx.font="bold 20px Arial";
+
+    ctx.font=
+      "bold 20px Arial";
 
     ctx.fillText(
       "TAP TO REBOOT",
@@ -781,10 +1429,11 @@ function draw(){
 
   }
 
+
   if(flash>0){
 
     ctx.fillStyle=
-      "rgba(255,30,20,.08)";
+      "rgba(255,30,20,.07)";
 
     ctx.fillRect(
       0,
@@ -794,9 +1443,13 @@ function draw(){
     );
 
   }
+
 }
 
-// ---------- LOOP ----------
+
+// =====================================
+// LOOP
+// =====================================
 
 function loop(){
 
@@ -805,6 +1458,7 @@ function loop(){
 
   requestAnimationFrame(loop);
 }
+
 
 canvas.addEventListener(
   "pointerdown",
@@ -815,6 +1469,7 @@ canvas.addEventListener(
 
   }
 );
+
 
 loop();
 </script>
