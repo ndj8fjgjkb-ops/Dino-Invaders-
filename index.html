@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Dino Invaders</title>
+
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#08130b;
+  touch-action:none;
+  font-family:Arial,sans-serif;
+}
+canvas{
+  display:block;
+  width:100vw;
+  height:100vh;
+}
+</style>
+</head>
+
+<body>
+<canvas id="game"></canvas>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+let W,H,dpr;
+function resize(){
+  dpr=Math.min(devicePixelRatio||1,2);
+  W=innerWidth;
+  H=innerHeight;
+  canvas.width=W*dpr;
+  canvas.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+resize();
+addEventListener("resize",resize);
+
+let state="start";
+let score=0;
+let high=Number(localStorage.dinoHigh||0);
+let frame=0;
+
+const dino={
+  x:70,
+  y:250,
+  vy:0,
+  r:22
+};
+
+let bullets=[];
+let enemies=[];
+let obstacles=[];
+let particles=[];
+
+function reset(){
+  score=0;
+  frame=0;
+  dino.y=H*.45;
+  dino.vy=0;
+  bullets=[];
+  enemies=[];
+  obstacles=[];
+  particles=[];
+}
+
+function start(){
+  reset();
+  state="play";
+}
+
+function flap(){
+  if(state==="start"||state==="dead"){
+    start();
+    return;
+  }
+  dino.vy=-7;
+  shoot();
+}
+
+function shoot(){
+  bullets.push({
+    x:dino.x+25,
+    y:dino.y,
+    vx:8
+  });
+}
+
+function spawnEnemy(){
+  enemies.push({
+    x:W+40,
+    y:70+Math.random()*(H-180),
+    vx:2.5+Math.random()*1.5,
+    r:18
+  });
+}
+
+function spawnObstacle(){
+  let gap=170;
+  let top=70+Math.random()*(H-gap-180);
+
+  obstacles.push({
+    x:W+40,
+    w:55,
+    top:top,
+    bottom:top+gap,
+    passed:false
+  });
+}
+
+function hitCircle(a,b){
+  let dx=a.x-b.x;
+  let dy=a.y-b.y;
+  let r=a.r+b.r;
+  return dx*dx+dy*dy<r*r;
+}
+
+function explode(x,y){
+  for(let i=0;i<12;i++){
+    particles.push({
+      x,y,
+      vx:(Math.random()-.5)*6,
+      vy:(Math.random()-.5)*6,
+      life:30
+    });
+  }
+}
+
+function die(){
+  if(state!=="play")return;
+  state="dead";
+
+  if(score>high){
+    high=score;
+    localStorage.dinoHigh=high;
+  }
+
+  explode(dino.x,dino.y);
+}
+
+function update(){
+  if(state!=="play")return;
+
+  frame++;
+
+  dino.vy+=.38;
+  dino.y+=dino.vy;
+
+  if(dino.y<20||dino.y>H-35) die();
+
+  if(frame%105===0) spawnObstacle();
+  if(frame%145===0) spawnEnemy();
+
+  bullets.forEach(b=>b.x+=b.vx);
+  bullets=bullets.filter(b=>b.x<W+30);
+
+  enemies.forEach(e=>e.x-=e.vx);
+
+  obstacles.forEach(o=>{
+    o.x-=2.8;
+
+    if(!o.passed && o.x+o.w<dino.x){
+      o.passed=true;
+      score++;
+    }
+
+    if(
+      dino.x+dino.r>o.x &&
+      dino.x-dino.r<o.x+o.w &&
+      (dino.y-dino.r<o.top ||
+       dino.y+dino.r>o.bottom)
+    ){
+      die();
+    }
+  });
+
+  obstacles=obstacles.filter(o=>o.x>-80);
+
+  for(let i=enemies.length-1;i>=0;i--){
+    let e=enemies[i];
+
+    if(hitCircle(dino,e)){
+      die();
+    }
+
+    for(let j=bullets.length-1;j>=0;j--){
+      let b=bullets[j];
+      let dx=b.x-e.x;
+      let dy=b.y-e.y;
+
+      if(dx*dx+dy*dy<e.r*e.r){
+        explode(e.x,e.y);
+        enemies.splice(i,1);
+        bullets.splice(j,1);
+        score+=2;
+        break;
+      }
+    }
+  }
+
+  enemies=enemies.filter(e=>e.x>-50);
+
+  particles.forEach(p=>{
+    p.x+=p.vx;
+    p.y+=p.vy;
+    p.life--;
+  });
+
+  particles=particles.filter(p=>p.life>0);
+}
+
+function background(){
+  let g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#07152a");
+  g.addColorStop(.55,"#214d45");
+  g.addColorStop(1,"#18321d");
+
+  ctx.fillStyle=g;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle="#132a1a";
+
+  for(let i=0;i<W;i+=90){
+    let h=70+((i*7)%80);
+
+    ctx.beginPath();
+    ctx.moveTo(i,H);
+    ctx.lineTo(i+45,H-h);
+    ctx.lineTo(i+90,H);
+    ctx.fill();
+  }
+
+  ctx.fillStyle="#0b2011";
+  ctx.fillRect(0,H-30,W,30);
+}
+
+function drawDino(){
+  ctx.save();
+  ctx.translate(dino.x,dino.y);
+
+  ctx.fillStyle="#7cff59";
+
+  ctx.beginPath();
+  ctx.arc(0,0,20,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillRect(10,-15,24,18);
+
+  ctx.fillStyle="#fff";
+  ctx.beginPath();
+  ctx.arc(25,-9,5,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="#111";
+  ctx.beginPath();
+  ctx.arc(27,-9,2,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="#7cff59";
+  ctx.beginPath();
+  ctx.moveTo(-18,5);
+  ctx.lineTo(-42,15);
+  ctx.lineTo(-18,-6);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawEnemy(e){
+  ctx.save();
+  ctx.translate(e.x,e.y);
+
+  ctx.fillStyle="#ff4f70";
+  ctx.beginPath();
+  ctx.arc(0,0,e.r,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="#ffd75a";
+  ctx.fillRect(-22,-5,44,10);
+
+  ctx.fillStyle="#fff";
+  ctx.beginPath();
+  ctx.arc(-6,-3,4,0,Math.PI*2);
+  ctx.arc(6,-3,4,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function draw(){
+  background();
+
+  obstacles.forEach(o=>{
+    ctx.fillStyle="#477d32";
+
+    ctx.fillRect(o.x,0,o.w,o.top);
+    ctx.fillRect(o.x,o.bottom,o.w,H-o.bottom);
+
+    ctx.fillStyle="#65a844";
+    ctx.fillRect(o.x-5,o.top-18,o.w+10,18);
+    ctx.fillRect(o.x-5,o.bottom,o.w+10,18);
+  });
+
+  bullets.forEach(b=>{
+    ctx.fillStyle="#ffe95e";
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,5,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  enemies.forEach(drawEnemy);
+
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life/30;
+    ctx.fillStyle="#ffd34d";
+    ctx.fillRect(p.x,p.y,5,5);
+  });
+
+  ctx.globalAlpha=1;
+
+  drawDino();
+
+  ctx.textAlign="center";
+
+  ctx.fillStyle="#fff";
+  ctx.font="bold 30px Arial";
+  ctx.fillText(score,W/2,55);
+
+  ctx.font="15px Arial";
+  ctx.fillText("BEST "+high,W/2,78);
+
+  if(state==="start"){
+    ctx.fillStyle="rgba(0,0,0,.45)";
+    ctx.fillRect(20,H*.25,W-40,260);
+
+    ctx.fillStyle="#fff";
+    ctx.font="bold 38px Arial";
+    ctx.fillText("DINO",W/2,H*.34);
+
+    ctx.fillStyle="#7cff59";
+    ctx.fillText("INVADERS",W/2,H*.40);
+
+    ctx.fillStyle="#fff";
+    ctx.font="20px Arial";
+    ctx.fillText("TAP TO FLY + FIRE",W/2,H*.50);
+
+    ctx.font="15px Arial";
+    ctx.fillText("Dodge the jungle. Blast the invaders.",W/2,H*.55);
+
+    ctx.font="bold 22px Arial";
+    ctx.fillText("TAP TO START",W/2,H*.64);
+  }
+
+  if(state==="dead"){
+    ctx.fillStyle="rgba(0,0,0,.58)";
+    ctx.fillRect(25,H*.31,W-50,220);
+
+    ctx.fillStyle="#fff";
+    ctx.font="bold 34px Arial";
+    ctx.fillText("EXTINCT!",W/2,H*.40);
+
+    ctx.font="22px Arial";
+    ctx.fillText("Score: "+score,W/2,H*.47);
+
+    ctx.font="bold 20px Arial";
+    ctx.fillText("TAP TO TRY AGAIN",W/2,H*.56);
+  }
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+canvas.addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  flap();
+});
+
+loop();
+</script>
+</body>
+</html>
