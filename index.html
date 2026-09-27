@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport"
-content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Dino Invaders V5.3</title>
+<title>Dino Invaders V5.4</title>
 
 <style>
 html,body{
@@ -29,23 +29,31 @@ canvas{
 <canvas id="game"></canvas>
 
 <script>
-
 const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
+const ctx=canvas.getContext("2d",{
+  alpha:false,
+  desynchronized:true
+});
 
-let W,H,dpr;
+let W=innerWidth;
+let H=innerHeight;
 
+/*
+  PERFORMANCE CHANGE:
+  render at CSS-pixel resolution.
+
+  Safari then doesn't have to process
+  a giant Retina canvas every frame.
+*/
 function resize(){
-
-  dpr=Math.min(window.devicePixelRatio||1,1.25);
-
   W=innerWidth;
   H=innerHeight;
 
-  canvas.width=Math.floor(W*dpr);
-  canvas.height=Math.floor(H*dpr);
+  canvas.width=Math.round(W);
+  canvas.height=Math.round(H);
 
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="medium";
 }
 
 resize();
@@ -56,28 +64,159 @@ addEventListener("resize",resize);
 // ASSETS
 // =====================================
 
+const ASSETS={
+  background:"A2AE5350-54C3-4BD9-9090-6061E6C83F85.png",
+  player:"8BBBE99D-BE50-463D-AB99-9356374B034D.png",
+  enemy:"223E8F5F-AC53-4AC9-9DAE-CCF47D50F608.png",
+  top:"8DCB4E86-B1D1-49F0-9B39-F9719AC68DFA.png",
+  bottom:"3FC9FF8B-E285-4302-B4B1-4B4F22CC01EB.png"
+};
+
 const backgroundImg=new Image();
-backgroundImg.src=
-"A2AE5350-54C3-4BD9-9090-6061E6C83F85.png";
-
 const raptorImg=new Image();
-raptorImg.src=
-"8BBBE99D-BE50-463D-AB99-9356374B034D.png";
-
 const enemyImg=new Image();
-enemyImg.src=
-"223E8F5F-AC53-4AC9-9DAE-CCF47D50F608.png";
-
-
-// TRUE SEPARATE RUINS
-
 const topRuinImg=new Image();
-topRuinImg.src=
-"8DCB4E86-B1D1-49F0-9B39-F9719AC68DFA.png";
-
 const bottomRuinImg=new Image();
-bottomRuinImg.src=
-"3FC9FF8B-E285-4302-B4B1-4B4F22CC01EB.png";
+
+
+// =====================================
+// PRE-RENDERED ART
+// =====================================
+
+let backgroundCache=null;
+let topCache=null;
+let bottomCache=null;
+
+let assetsLoaded=false;
+
+
+/*
+  Make a smaller canvas copy ONCE.
+
+  The game then draws these lightweight
+  cached canvases instead of resizing
+  the original huge PNG every frame.
+*/
+function makeCache(img,width){
+
+  const ratio=
+    img.naturalHeight/
+    img.naturalWidth;
+
+  const c=document.createElement("canvas");
+
+  c.width=Math.round(width);
+  c.height=Math.round(width*ratio);
+
+  const cctx=c.getContext("2d",{
+    alpha:true
+  });
+
+  cctx.imageSmoothingEnabled=true;
+  cctx.imageSmoothingQuality="high";
+
+  cctx.drawImage(
+    img,
+    0,
+    0,
+    c.width,
+    c.height
+  );
+
+  return c;
+}
+
+
+function buildCaches(){
+
+  /*
+    Ruins are cached close to the
+    exact size they appear on screen.
+  */
+
+  topCache=
+    makeCache(
+      topRuinImg,
+      260
+    );
+
+  bottomCache=
+    makeCache(
+      bottomRuinImg,
+      260
+    );
+
+
+  /*
+    Background gets reduced once too.
+    900px is plenty for an iPhone
+    game canvas.
+  */
+
+  backgroundCache=
+    makeCache(
+      backgroundImg,
+      900
+    );
+}
+
+
+// =====================================
+// PRELOAD EVERYTHING
+// =====================================
+
+function loadImage(img,src){
+
+  return new Promise(resolve=>{
+
+    img.onload=resolve;
+
+    img.onerror=resolve;
+
+    img.src=src;
+  });
+}
+
+
+Promise.all([
+
+  loadImage(
+    backgroundImg,
+    ASSETS.background
+  ),
+
+  loadImage(
+    raptorImg,
+    ASSETS.player
+  ),
+
+  loadImage(
+    enemyImg,
+    ASSETS.enemy
+  ),
+
+  loadImage(
+    topRuinImg,
+    ASSETS.top
+  ),
+
+  loadImage(
+    bottomRuinImg,
+    ASSETS.bottom
+  )
+
+]).then(()=>{
+
+  if(
+    backgroundImg.naturalWidth &&
+    topRuinImg.naturalWidth &&
+    bottomRuinImg.naturalWidth
+  ){
+    buildCaches();
+  }
+
+  assetsLoaded=true;
+});
 
 
 // =====================================
@@ -87,7 +226,10 @@ bottomRuinImg.src=
 let state="start";
 
 let score=0;
-let high=Number(localStorage.dinoHigh||0);
+let high=
+  Number(
+    localStorage.dinoHigh||0
+  );
 
 let frame=0;
 let worldX=0;
@@ -120,15 +262,21 @@ function reset(){
   player.y=H*.45;
   player.vy=0;
 
-  bullets=[];
-  enemies=[];
-  ruins=[];
-  particles=[];
+  bullets.length=0;
+  enemies.length=0;
+  ruins.length=0;
+  particles.length=0;
 }
+
 
 function startGame(){
 
+  if(!assetsLoaded){
+    return;
+  }
+
   reset();
+
   state="play";
 }
 
@@ -139,7 +287,10 @@ function startGame(){
 
 function tap(){
 
-  if(state==="start" || state==="dead"){
+  if(
+    state==="start" ||
+    state==="dead"
+  ){
 
     startGame();
     return;
@@ -150,21 +301,21 @@ function tap(){
   shoot();
 
 
-  for(let i=0;i<4;i++){
+  for(let i=0;i<3;i++){
 
     particles.push({
 
-      x:player.x-35,
-      y:player.y+8,
+      x:player.x-34,
+      y:player.y+7,
 
       vx:-2-Math.random()*2,
       vy:(Math.random()-.5)*2,
 
-      life:15,
+      life:13,
 
       size:
         2+
-        Math.random()*3,
+        Math.random()*2,
 
       type:"red"
     });
@@ -188,34 +339,32 @@ function shoot(){
 
 
 // =====================================
-// RUINS
+// SPAWN RUINS
 // =====================================
 
 function spawnRuin(){
 
-  /*
-    Wider passage because the new
-    ruins are visually much larger.
-  */
-
   const gap=Math.max(
     205,
-    Math.min(240,H*.32)
+    Math.min(
+      240,
+      H*.32
+    )
   );
 
-  const edgeMargin=95;
+  const margin=95;
 
   const minCenter=
-    edgeMargin+
+    margin+
     gap/2;
 
   const maxCenter=
     H-
-    edgeMargin-
+    margin-
     gap/2;
 
-
   let center=H*.5;
+
 
   if(maxCenter>minCenter){
 
@@ -230,18 +379,22 @@ function spawnRuin(){
 
     x:W+190,
 
+    visualW:260,
+
     /*
-      This is now the gameplay
-      collision width — not the
-      full visual width.
+      Collision is intentionally
+      narrower than the artwork.
     */
 
     hitW:128,
 
-    visualW:255,
+    top:
+      center-
+      gap/2,
 
-    top:center-gap/2,
-    bottom:center+gap/2,
+    bottom:
+      center+
+      gap/2,
 
     passed:false
   });
@@ -249,7 +402,7 @@ function spawnRuin(){
 
 
 // =====================================
-// ENEMIES
+// SPAWN ENEMY
 // =====================================
 
 function spawnEnemy(){
@@ -287,7 +440,12 @@ function spawnEnemy(){
 
 function explode(x,y,type){
 
-  for(let i=0;i<12;i++){
+  /*
+    Slightly fewer particles than V5.3
+    to reduce spikes during explosions.
+  */
+
+  for(let i=0;i<9;i++){
 
     particles.push({
 
@@ -295,18 +453,18 @@ function explode(x,y,type){
       y,
 
       vx:
-        (Math.random()-.5)*7,
+        (Math.random()-.5)*6,
 
       vy:
-        (Math.random()-.5)*7,
+        (Math.random()-.5)*6,
 
       life:
-        18+
-        Math.random()*10,
+        17+
+        Math.random()*8,
 
       size:
         2+
-        Math.random()*4,
+        Math.random()*3,
 
       type
     });
@@ -335,7 +493,9 @@ function circleHit(a,b){
 
 function die(){
 
-  if(state!=="play") return;
+  if(state!=="play"){
+    return;
+  }
 
   state="dead";
 
@@ -349,6 +509,7 @@ function die(){
   if(score>high){
 
     high=score;
+
     localStorage.dinoHigh=high;
   }
 }
@@ -360,8 +521,10 @@ function die(){
 
 function update(){
 
-  if(recoil>0){
+  if(recoil>.05){
     recoil*=.7;
+  }else{
+    recoil=0;
   }
 
 
@@ -407,12 +570,11 @@ function update(){
     player.y<18 ||
     player.y>H-28
   ){
-
     die();
   }
 
 
-  // SPAWNING
+  // SPAWN
 
   if(frame%126===0){
     spawnRuin();
@@ -432,15 +594,12 @@ function update(){
     i--
   ){
 
-    bullets[i].x+=
-      bullets[i].vx;
+    const b=bullets[i];
+
+    b.x+=b.vx;
 
 
-    if(
-      bullets[i].x>
-      W+50
-    ){
-
+    if(b.x>W+50){
       bullets.splice(i,1);
     }
   }
@@ -458,11 +617,6 @@ function update(){
 
     r.x-=2.55;
 
-
-    /*
-      Narrower invisible collision
-      zone inside the large artwork.
-    */
 
     const hitLeft=
       r.x+
@@ -507,16 +661,14 @@ function update(){
       )
 
     ){
-
       die();
     }
 
 
     if(
       r.x<
-      -r.visualW-40
+      -r.visualW-30
     ){
-
       ruins.splice(i,1);
     }
   }
@@ -588,7 +740,6 @@ function update(){
       enemies[i] &&
       enemies[i].x<-120
     ){
-
       enemies.splice(i,1);
     }
   }
@@ -601,148 +752,99 @@ function update(){
 
 function drawBackground(){
 
-  if(
-    backgroundImg.complete &&
-    backgroundImg.naturalWidth
-  ){
-
-    const iw=
-      backgroundImg.naturalWidth;
-
-    const ih=
-      backgroundImg.naturalHeight;
-
-
-    /*
-      Cover screen while preserving
-      image proportions.
-    */
-
-    const scale=
-      Math.max(
-        W/iw,
-        H/ih
-      );
-
-
-    const sourceW=
-      Math.min(
-        iw,
-        W/scale
-      );
-
-    const sourceH=
-      Math.min(
-        ih,
-        H/scale
-      );
-
-
-    const maxX=
-      Math.max(
-        0,
-        iw-sourceW
-      );
-
-
-    let sx=0;
-
-    if(maxX>0){
-
-      /*
-        Slow background movement.
-      */
-
-      sx=
-        (worldX*.055)%
-        maxX;
-    }
-
-
-    const sy=
-      Math.max(
-        0,
-        Math.min(
-          ih-sourceH,
-          (ih-sourceH)*.48
-        )
-      );
-
-
-    const firstSourceW=
-      Math.min(
-        sourceW,
-        iw-sx
-      );
-
-
-    const firstScreenW=
-      firstSourceW*
-      scale;
-
-
-    ctx.drawImage(
-
-      backgroundImg,
-
-      sx,
-      sy,
-
-      firstSourceW,
-      sourceH,
-
-      0,
-      0,
-
-      firstScreenW,
-      H
-    );
-
-
-    if(firstScreenW<W){
-
-      const remaining=
-        W-firstScreenW;
-
-
-      ctx.drawImage(
-
-        backgroundImg,
-
-        0,
-        sy,
-
-        remaining/scale,
-        sourceH,
-
-        firstScreenW,
-        0,
-
-        remaining,
-        H
-      );
-    }
-
-  }else{
+  if(!backgroundCache){
 
     ctx.fillStyle="#7fa9bf";
 
     ctx.fillRect(
       0,0,W,H
     );
+
+    return;
   }
 
 
+  const iw=
+    backgroundCache.width;
+
+  const ih=
+    backgroundCache.height;
+
+
   /*
-    Tiny atmospheric layer for
-    character readability.
+    Cover the phone screen.
   */
 
-  ctx.fillStyle=
-    "rgba(170,195,185,.035)";
+  const scale=
+    Math.max(
+      W/iw,
+      H/ih
+    );
 
-  ctx.fillRect(
-    0,0,W,H
+
+  const sourceW=
+    Math.min(
+      iw,
+      W/scale
+    );
+
+  const sourceH=
+    Math.min(
+      ih,
+      H/scale
+    );
+
+
+  const maxX=
+    Math.max(
+      0,
+      iw-sourceW
+    );
+
+
+  let sx=0;
+
+
+  if(maxX>1){
+
+    /*
+      Ping-pong movement instead of
+      wrapping the background seam.
+    */
+
+    const travel=
+      (worldX*.025)%
+      (maxX*2);
+
+    sx=
+      travel<=maxX
+      ? travel
+      : maxX*2-travel;
+  }
+
+
+  const sy=
+    Math.max(
+      0,
+      (ih-sourceH)*.48
+    );
+
+
+  ctx.drawImage(
+
+    backgroundCache,
+
+    sx,
+    sy,
+
+    sourceW,
+    sourceH,
+
+    0,
+    0,
+
+    W,
+    H
   );
 }
 
@@ -753,73 +855,75 @@ function drawBackground(){
 
 function drawTopRuin(r){
 
-  const img=topRuinImg;
-
-
-  if(
-    !img.complete ||
-    !img.naturalWidth
-  ){
-
-    ctx.fillStyle="#536451";
-
-    ctx.fillRect(
-      r.x,
-      0,
-      r.visualW,
-      r.top
-    );
-
+  if(!topCache){
     return;
   }
 
 
-  const ratio=
-    img.naturalHeight/
-    img.naturalWidth;
-
-
   /*
-    Big, chunky obstacle.
+    Cached image is already 260px wide.
+
+    No resizing of the original PNG
+    happens here.
   */
 
   const drawW=
     r.visualW;
 
   const naturalH=
-    drawW*
-    ratio;
+    topCache.height;
 
 
   /*
-    We want the bottom edge of
-    the artwork to meet the exact
-    gameplay opening.
+    Extend upward beyond the screen
+    rather than stretching the image.
   */
 
-  const drawH=
-    Math.max(
-      naturalH,
-      r.top+70
-    );
-
+  const bottomY=
+    r.top+18;
 
   const drawY=
-    r.top-
-    drawH+
-    22;
+    bottomY-
+    naturalH;
 
 
   ctx.drawImage(
 
-    img,
+    topCache,
 
-    r.x,
-    drawY,
-
-    drawW,
-    drawH
+    Math.round(r.x),
+    Math.round(drawY)
   );
+
+
+  /*
+    If the artwork doesn't reach the
+    very top, continue it with a dark
+    rock backing behind the image.
+  */
+
+  if(drawY>0){
+
+    ctx.fillStyle="#26382e";
+
+    ctx.fillRect(
+      Math.round(r.x+24),
+      0,
+      drawW-48,
+      Math.ceil(drawY+5)
+    );
+
+    /*
+      Redraw image so it stays above
+      the simple backing.
+    */
+
+    ctx.drawImage(
+      topCache,
+      Math.round(r.x),
+      Math.round(drawY)
+    );
+  }
 }
 
 
@@ -829,72 +933,57 @@ function drawTopRuin(r){
 
 function drawBottomRuin(r){
 
-  const img=
-    bottomRuinImg;
-
-
-  if(
-    !img.complete ||
-    !img.naturalWidth
-  ){
-
-    ctx.fillStyle="#536451";
-
-    ctx.fillRect(
-      r.x,
-      r.bottom,
-      r.visualW,
-      H-r.bottom
-    );
-
+  if(!bottomCache){
     return;
   }
-
-
-  const ratio=
-    img.naturalHeight/
-    img.naturalWidth;
-
-
-  const drawW=
-    r.visualW;
-
-
-  const naturalH=
-    drawW*
-    ratio;
-
-
-  /*
-    Bottom obstacle starts directly
-    beneath the gameplay opening.
-  */
-
-  const available=
-    H-r.bottom;
-
-
-  const drawH=
-    Math.max(
-      naturalH,
-      available+60
-    );
 
 
   const drawY=
     r.bottom-18;
 
 
+  /*
+    Again: cached asset is drawn at
+    native cached size. No expensive
+    resize every frame.
+  */
+
   ctx.drawImage(
 
-    img,
+    bottomCache,
 
-    r.x,
-    drawY,
-
-    drawW,
-    drawH
+    Math.round(r.x),
+    Math.round(drawY)
   );
+
+
+  /*
+    Continue the structure below the
+    image if necessary.
+  */
+
+  const imageBottom=
+    drawY+
+    bottomCache.height;
+
+
+  if(imageBottom<H){
+
+    ctx.fillStyle="#26382e";
+
+    ctx.fillRect(
+
+      Math.round(r.x+24),
+
+      Math.floor(
+        imageBottom-3
+      ),
+
+      r.visualW-48,
+
+      H-imageBottom+5
+    );
+  }
 }
 
 
@@ -908,8 +997,12 @@ function drawPlayer(){
 
 
   ctx.translate(
-    player.x-recoil,
-    player.y
+    Math.round(
+      player.x-recoil
+    ),
+    Math.round(
+      player.y
+    )
   );
 
 
@@ -979,8 +1072,8 @@ function drawEnemy(e){
   ctx.save();
 
   ctx.translate(
-    e.x,
-    e.y
+    Math.round(e.x),
+    Math.round(e.y)
   );
 
   ctx.scale(-1,1);
@@ -1010,19 +1103,6 @@ function drawEnemy(e){
       h
     );
 
-  }else{
-
-    ctx.fillStyle="#f7942d";
-
-    ctx.beginPath();
-
-    ctx.arc(
-      0,0,20,
-      0,
-      Math.PI*2
-    );
-
-    ctx.fill();
   }
 
 
@@ -1036,9 +1116,10 @@ function drawEnemy(e){
 
 function drawBullets(){
 
-  for(const b of bullets){
+  ctx.fillStyle="#ff352d";
 
-    ctx.fillStyle="#ff352d";
+
+  for(const b of bullets){
 
     ctx.beginPath();
 
@@ -1048,21 +1129,6 @@ function drawBullets(){
       13,
       3,
       0,
-      0,
-      Math.PI*2
-    );
-
-    ctx.fill();
-
-
-    ctx.fillStyle="#fff";
-
-    ctx.beginPath();
-
-    ctx.arc(
-      b.x+4,
-      b.y,
-      2.5,
       0,
       Math.PI*2
     );
@@ -1083,7 +1149,7 @@ function drawParticles(){
     ctx.globalAlpha=
       Math.max(
         0,
-        p.life/28
+        p.life/25
       );
 
 
@@ -1121,12 +1187,6 @@ function drawHUD(){
 
   ctx.fillStyle="#fff";
 
-  ctx.shadowColor=
-    "rgba(0,0,0,.7)";
-
-  ctx.shadowBlur=4;
-
-
   ctx.font=
     "bold 30px Arial";
 
@@ -1147,20 +1207,17 @@ function drawHUD(){
     W/2,
     75
   );
-
-
-  ctx.shadowBlur=0;
 }
 
 
 // =====================================
-// START
+// START SCREEN
 // =====================================
 
 function drawStart(){
 
   ctx.fillStyle=
-    "rgba(12,28,24,.62)";
+    "rgba(12,28,24,.65)";
 
 
   ctx.fillRect(
@@ -1199,37 +1256,41 @@ function drawStart(){
 
   ctx.fillStyle="#fff";
 
-  ctx.font=
-    "16px Arial";
+  ctx.font="16px Arial";
 
 
   ctx.fillText(
-    "CYBER RAPTOR ONLINE",
+    assetsLoaded
+      ? "CYBER RAPTOR ONLINE"
+      : "LOADING SYSTEMS...",
     W/2,
     H*.49
   );
 
 
-  ctx.font=
-    "bold 21px Arial";
+  if(assetsLoaded){
+
+    ctx.font=
+      "bold 21px Arial";
 
 
-  ctx.fillText(
-    "TAP TO START",
-    W/2,
-    H*.59
-  );
+    ctx.fillText(
+      "TAP TO START",
+      W/2,
+      H*.59
+    );
+  }
 }
 
 
 // =====================================
-// GAME OVER
+// DEAD
 // =====================================
 
 function drawDead(){
 
   ctx.fillStyle=
-    "rgba(12,28,24,.70)";
+    "rgba(12,28,24,.72)";
 
 
   ctx.fillRect(
@@ -1290,13 +1351,6 @@ function draw(){
   drawBackground();
 
 
-  /*
-    Separate images.
-    No crop.
-    No split.
-    No flip.
-  */
-
   for(const r of ruins){
 
     drawTopRuin(r);
@@ -1331,29 +1385,72 @@ function draw(){
 
 
 // =====================================
-// LOOP
+// FIXED UPDATE LOOP
 // =====================================
 
-function loop(){
+let previousTime=performance.now();
+let accumulator=0;
 
-  update();
+const STEP=1000/60;
+
+
+/*
+  Fixed game updates prevent physics
+  from changing speed when Safari
+  briefly drops a frame.
+*/
+function loop(now){
+
+  let delta=
+    now-
+    previousTime;
+
+  previousTime=now;
+
+
+  /*
+    Prevent giant catch-up jumps.
+  */
+
+  if(delta>80){
+    delta=80;
+  }
+
+
+  accumulator+=delta;
+
+
+  while(accumulator>=STEP){
+
+    update();
+
+    accumulator-=STEP;
+  }
+
+
   draw();
 
   requestAnimationFrame(loop);
 }
 
 
+// =====================================
+// INPUT
+// =====================================
+
 canvas.addEventListener(
   "pointerdown",
   function(e){
 
     e.preventDefault();
+
     tap();
-  }
+  },
+  {passive:false}
 );
 
 
-loop();
+requestAnimationFrame(loop);
 
 </script>
 </body>
