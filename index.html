@@ -5,7 +5,7 @@
 <meta name="viewport"
 content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Dino Invaders V5.2</title>
+<title>Dino Invaders V5.3</title>
 
 <style>
 html,body{
@@ -29,13 +29,16 @@ canvas{
 <canvas id="game"></canvas>
 
 <script>
+
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 
 let W,H,dpr;
 
 function resize(){
+
   dpr=Math.min(window.devicePixelRatio||1,1.25);
+
   W=innerWidth;
   H=innerHeight;
 
@@ -49,9 +52,9 @@ resize();
 addEventListener("resize",resize);
 
 
-// ===============================
+// =====================================
 // ASSETS
-// ===============================
+// =====================================
 
 const backgroundImg=new Image();
 backgroundImg.src=
@@ -65,16 +68,24 @@ const enemyImg=new Image();
 enemyImg.src=
 "223E8F5F-AC53-4AC9-9DAE-CCF47D50F608.png";
 
-const ruinImg=new Image();
-ruinImg.src=
-"3F93822F-F1CA-4436-A3D1-85B1412391AB.png";
+
+// TRUE SEPARATE RUINS
+
+const topRuinImg=new Image();
+topRuinImg.src=
+"8DCB4E86-B1D1-49F0-9B39-F9719AC68DFA.png";
+
+const bottomRuinImg=new Image();
+bottomRuinImg.src=
+"3FC9FF8B-E285-4302-B4B1-4B4F22CC01EB.png";
 
 
-// ===============================
-// GAME
-// ===============================
+// =====================================
+// GAME STATE
+// =====================================
 
 let state="start";
+
 let score=0;
 let high=Number(localStorage.dinoHigh||0);
 
@@ -95,11 +106,12 @@ const player={
 };
 
 
-// ===============================
+// =====================================
 // RESET
-// ===============================
+// =====================================
 
 function reset(){
+
   score=0;
   frame=0;
   worldX=0;
@@ -115,43 +127,58 @@ function reset(){
 }
 
 function startGame(){
+
   reset();
   state="play";
 }
 
 
-// ===============================
+// =====================================
 // INPUT
-// ===============================
+// =====================================
 
 function tap(){
 
   if(state==="start" || state==="dead"){
+
     startGame();
     return;
   }
 
   player.vy=-7.1;
+
   shoot();
 
+
   for(let i=0;i<4;i++){
+
     particles.push({
+
       x:player.x-35,
       y:player.y+8,
+
       vx:-2-Math.random()*2,
       vy:(Math.random()-.5)*2,
+
       life:15,
-      size:2+Math.random()*3,
+
+      size:
+        2+
+        Math.random()*3,
+
       type:"red"
     });
   }
 }
 
+
 function shoot(){
 
   bullets.push({
+
     x:player.x+46,
     y:player.y-4,
+
     vx:10,
     r:5
   });
@@ -160,44 +187,84 @@ function shoot(){
 }
 
 
-// ===============================
-// SPAWNING
-// ===============================
+// =====================================
+// RUINS
+// =====================================
 
 function spawnRuin(){
 
-  const gap=Math.max(190,Math.min(225,H*.31));
+  /*
+    Wider passage because the new
+    ruins are visually much larger.
+  */
 
-  const margin=125;
-  const minCenter=margin+gap/2;
-  const maxCenter=H-margin-gap/2;
+  const gap=Math.max(
+    205,
+    Math.min(240,H*.32)
+  );
+
+  const edgeMargin=95;
+
+  const minCenter=
+    edgeMargin+
+    gap/2;
+
+  const maxCenter=
+    H-
+    edgeMargin-
+    gap/2;
+
 
   let center=H*.5;
 
   if(maxCenter>minCenter){
-    center=minCenter+
-      Math.random()*(maxCenter-minCenter);
+
+    center=
+      minCenter+
+      Math.random()*
+      (maxCenter-minCenter);
   }
 
+
   ruins.push({
-    x:W+120,
-    w:112,
+
+    x:W+190,
+
+    /*
+      This is now the gameplay
+      collision width — not the
+      full visual width.
+    */
+
+    hitW:128,
+
+    visualW:255,
+
     top:center-gap/2,
     bottom:center+gap/2,
+
     passed:false
   });
 }
 
 
+// =====================================
+// ENEMIES
+// =====================================
+
 function spawnEnemy(){
 
   enemies.push({
-    x:W+80,
+
+    x:W+90,
 
     baseY:
-      110+
+      105+
       Math.random()*
-      Math.max(80,H-240),
+      Math.max(
+        90,
+        H-230
+      ),
 
     y:H*.5,
 
@@ -208,43 +275,61 @@ function spawnEnemy(){
     r:19,
 
     phase:
-      Math.random()*Math.PI*2
+      Math.random()*
+      Math.PI*2
   });
 }
 
 
-// ===============================
-// EFFECTS
-// ===============================
+// =====================================
+// PARTICLES
+// =====================================
 
 function explode(x,y,type){
 
   for(let i=0;i<12;i++){
 
     particles.push({
+
       x,
       y,
-      vx:(Math.random()-.5)*7,
-      vy:(Math.random()-.5)*7,
-      life:18+Math.random()*10,
-      size:2+Math.random()*4,
+
+      vx:
+        (Math.random()-.5)*7,
+
+      vy:
+        (Math.random()-.5)*7,
+
+      life:
+        18+
+        Math.random()*10,
+
+      size:
+        2+
+        Math.random()*4,
+
       type
     });
   }
 }
 
 
-// ===============================
+// =====================================
 // COLLISION
-// ===============================
+// =====================================
 
 function circleHit(a,b){
 
   const dx=a.x-b.x;
   const dy=a.y-b.y;
+
   const rr=a.r+b.r;
 
-  return dx*dx+dy*dy < rr*rr;
+  return(
+    dx*dx+
+    dy*dy<
+    rr*rr
+  );
 }
 
 
@@ -260,16 +345,18 @@ function die(){
     "red"
   );
 
+
   if(score>high){
+
     high=score;
     localStorage.dinoHigh=high;
   }
 }
 
 
-// ===============================
+// =====================================
 // UPDATE
-// ===============================
+// =====================================
 
 function update(){
 
@@ -277,13 +364,22 @@ function update(){
     recoil*=.7;
   }
 
-  for(let i=particles.length-1;i>=0;i--){
+
+  // PARTICLES
+
+  for(
+    let i=particles.length-1;
+    i>=0;
+    i--
+  ){
 
     const p=particles[i];
 
     p.x+=p.vx;
     p.y+=p.vy;
+
     p.life--;
+
 
     if(p.life<=0){
       particles.splice(i,1);
@@ -291,12 +387,17 @@ function update(){
   }
 
 
-  if(state!=="play") return;
+  if(state!=="play"){
+    return;
+  }
 
 
   frame++;
+
   worldX+=2.55;
 
+
+  // PLAYER
 
   player.vy+=.38;
   player.y+=player.vy;
@@ -306,27 +407,40 @@ function update(){
     player.y<18 ||
     player.y>H-28
   ){
+
     die();
   }
 
 
-  if(frame%122===0){
+  // SPAWNING
+
+  if(frame%126===0){
     spawnRuin();
   }
 
 
-  if(frame%165===0){
+  if(frame%170===0){
     spawnEnemy();
   }
 
 
   // BULLETS
 
-  for(let i=bullets.length-1;i>=0;i--){
+  for(
+    let i=bullets.length-1;
+    i>=0;
+    i--
+  ){
 
-    bullets[i].x+=bullets[i].vx;
+    bullets[i].x+=
+      bullets[i].vx;
 
-    if(bullets[i].x>W+50){
+
+    if(
+      bullets[i].x>
+      W+50
+    ){
+
       bullets.splice(i,1);
     }
   }
@@ -334,35 +448,75 @@ function update(){
 
   // RUINS
 
-  for(let i=ruins.length-1;i>=0;i--){
+  for(
+    let i=ruins.length-1;
+    i>=0;
+    i--
+  ){
 
     const r=ruins[i];
 
     r.x-=2.55;
 
 
+    /*
+      Narrower invisible collision
+      zone inside the large artwork.
+    */
+
+    const hitLeft=
+      r.x+
+      (r.visualW-r.hitW)/2;
+
+    const hitRight=
+      hitLeft+
+      r.hitW;
+
+
     if(
       !r.passed &&
-      r.x+r.w<player.x
+      hitRight<
+      player.x
     ){
+
       r.passed=true;
       score++;
     }
 
 
     if(
-      player.x+player.r>r.x &&
-      player.x-player.r<r.x+r.w &&
+
+      player.x+
+      player.r>
+      hitLeft &&
+
+      player.x-
+      player.r<
+      hitRight &&
+
       (
-        player.y-player.r<r.top ||
-        player.y+player.r>r.bottom
+
+        player.y-
+        player.r<
+        r.top ||
+
+        player.y+
+        player.r>
+        r.bottom
+
       )
+
     ){
+
       die();
     }
 
 
-    if(r.x<-180){
+    if(
+      r.x<
+      -r.visualW-40
+    ){
+
       ruins.splice(i,1);
     }
   }
@@ -370,15 +524,23 @@ function update(){
 
   // ENEMIES
 
-  for(let i=enemies.length-1;i>=0;i--){
+  for(
+    let i=enemies.length-1;
+    i>=0;
+    i--
+  ){
 
     const e=enemies[i];
 
     e.x-=e.vx;
 
+
     e.y=
       e.baseY+
-      Math.sin(frame*.05+e.phase)*13;
+      Math.sin(
+        frame*.05+
+        e.phase
+      )*13;
 
 
     if(circleHit(player,e)){
@@ -386,17 +548,31 @@ function update(){
     }
 
 
-    for(let j=bullets.length-1;j>=0;j--){
+    for(
+      let j=bullets.length-1;
+      j>=0;
+      j--
+    ){
 
       const b=bullets[j];
 
       const dx=b.x-e.x;
       const dy=b.y-e.y;
+
       const rr=b.r+e.r;
 
-      if(dx*dx+dy*dy<rr*rr){
 
-        explode(e.x,e.y,"orange");
+      if(
+        dx*dx+
+        dy*dy<
+        rr*rr
+      ){
+
+        explode(
+          e.x,
+          e.y,
+          "orange"
+        );
 
         enemies.splice(i,1);
         bullets.splice(j,1);
@@ -408,16 +584,20 @@ function update(){
     }
 
 
-    if(enemies[i] && enemies[i].x<-120){
+    if(
+      enemies[i] &&
+      enemies[i].x<-120
+    ){
+
       enemies.splice(i,1);
     }
   }
 }
 
 
-// ===============================
+// =====================================
 // BACKGROUND
-// ===============================
+// =====================================
 
 function drawBackground(){
 
@@ -426,82 +606,118 @@ function drawBackground(){
     backgroundImg.naturalWidth
   ){
 
-    const iw=backgroundImg.naturalWidth;
-    const ih=backgroundImg.naturalHeight;
+    const iw=
+      backgroundImg.naturalWidth;
+
+    const ih=
+      backgroundImg.naturalHeight;
+
 
     /*
-      COVER the screen without
-      stretching the artwork.
+      Cover screen while preserving
+      image proportions.
     */
 
-    const scale=Math.max(
-      W/iw,
-      H/ih
-    );
+    const scale=
+      Math.max(
+        W/iw,
+        H/ih
+      );
 
-    const sourceW=W/scale;
-    const sourceH=H/scale;
 
-    /*
-      Very slow horizontal drift.
-      We keep it subtle for
-      performance and readability.
-    */
+    const sourceW=
+      Math.min(
+        iw,
+        W/scale
+      );
 
-    const maxX=Math.max(0,iw-sourceW);
+    const sourceH=
+      Math.min(
+        ih,
+        H/scale
+      );
+
+
+    const maxX=
+      Math.max(
+        0,
+        iw-sourceW
+      );
+
 
     let sx=0;
 
     if(maxX>0){
-      sx=(worldX*.10)%maxX;
+
+      /*
+        Slow background movement.
+      */
+
+      sx=
+        (worldX*.055)%
+        maxX;
     }
 
-    const sy=Math.max(
-      0,
-      (ih-sourceH)*.47
-    );
+
+    const sy=
+      Math.max(
+        0,
+        Math.min(
+          ih-sourceH,
+          (ih-sourceH)*.48
+        )
+      );
+
+
+    const firstSourceW=
+      Math.min(
+        sourceW,
+        iw-sx
+      );
+
+
+    const firstScreenW=
+      firstSourceW*
+      scale;
 
 
     ctx.drawImage(
+
       backgroundImg,
 
       sx,
       sy,
-      Math.min(sourceW,iw-sx),
-      Math.min(sourceH,ih-sy),
+
+      firstSourceW,
+      sourceH,
 
       0,
       0,
-      W,
+
+      firstScreenW,
       H
     );
 
 
-    /*
-      If horizontal crop reaches
-      edge, fill remaining portion.
-    */
+    if(firstScreenW<W){
 
-    const usedSource=
-      Math.min(sourceW,iw-sx);
+      const remaining=
+        W-firstScreenW;
 
-    const usedScreen=
-      usedSource*scale;
-
-    if(usedScreen<W){
-
-      const remaining=W-usedScreen;
 
       ctx.drawImage(
+
         backgroundImg,
 
         0,
         sy,
+
         remaining/scale,
         sourceH,
 
-        usedScreen,
+        firstScreenW,
         0,
+
         remaining,
         H
       );
@@ -509,46 +725,125 @@ function drawBackground(){
 
   }else{
 
-    ctx.fillStyle="#83aebe";
-    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="#7fa9bf";
+
+    ctx.fillRect(
+      0,0,W,H
+    );
   }
 
 
   /*
-    Gentle atmospheric wash keeps
-    characters readable without
-    making the background empty.
+    Tiny atmospheric layer for
+    character readability.
   */
 
-  ctx.fillStyle="rgba(160,190,183,.08)";
-  ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=
+    "rgba(170,195,185,.035)";
+
+  ctx.fillRect(
+    0,0,W,H
+  );
 }
 
 
-// ===============================
-// RUINS
-// ===============================
+// =====================================
+// TOP RUIN
+// =====================================
 
-function drawRuin(r){
+function drawTopRuin(r){
+
+  const img=topRuinImg;
+
 
   if(
-    !ruinImg.complete ||
-    !ruinImg.naturalWidth
+    !img.complete ||
+    !img.naturalWidth
   ){
 
-    ctx.fillStyle="#566b57";
+    ctx.fillStyle="#536451";
 
     ctx.fillRect(
       r.x,
       0,
-      r.w,
+      r.visualW,
       r.top
     );
+
+    return;
+  }
+
+
+  const ratio=
+    img.naturalHeight/
+    img.naturalWidth;
+
+
+  /*
+    Big, chunky obstacle.
+  */
+
+  const drawW=
+    r.visualW;
+
+  const naturalH=
+    drawW*
+    ratio;
+
+
+  /*
+    We want the bottom edge of
+    the artwork to meet the exact
+    gameplay opening.
+  */
+
+  const drawH=
+    Math.max(
+      naturalH,
+      r.top+70
+    );
+
+
+  const drawY=
+    r.top-
+    drawH+
+    22;
+
+
+  ctx.drawImage(
+
+    img,
+
+    r.x,
+    drawY,
+
+    drawW,
+    drawH
+  );
+}
+
+
+// =====================================
+// BOTTOM RUIN
+// =====================================
+
+function drawBottomRuin(r){
+
+  const img=
+    bottomRuinImg;
+
+
+  if(
+    !img.complete ||
+    !img.naturalWidth
+  ){
+
+    ctx.fillStyle="#536451";
 
     ctx.fillRect(
       r.x,
       r.bottom,
-      r.w,
+      r.visualW,
       H-r.bottom
     );
 
@@ -556,88 +851,77 @@ function drawRuin(r){
   }
 
 
-  const iw=ruinImg.naturalWidth;
-  const ih=ruinImg.naturalHeight;
+  const ratio=
+    img.naturalHeight/
+    img.naturalWidth;
+
+
+  const drawW=
+    r.visualW;
+
+
+  const naturalH=
+    drawW*
+    ratio;
+
 
   /*
-    This artwork contains a clearly
-    separated TOP and BOTTOM ruin.
-
-    Crop each structure individually
-    and keep the center gap out.
+    Bottom obstacle starts directly
+    beneath the gameplay opening.
   */
 
-  const topSourceY=0;
-  const topSourceH=ih*.47;
-
-  const bottomSourceY=ih*.52;
-  const bottomSourceH=ih*.48;
+  const available=
+    H-r.bottom;
 
 
-  // TOP
-
-  const topW=155;
-  const topH=Math.max(185,r.top+55);
-
-  ctx.drawImage(
-    ruinImg,
-
-    0,
-    topSourceY,
-    iw,
-    topSourceH,
-
-    r.x-(topW-r.w)/2,
-    r.top-topH+18,
-
-    topW,
-    topH
-  );
-
-
-  // BOTTOM
-
-  const bottomW=165;
-  const bottomH=
+  const drawH=
     Math.max(
-      190,
-      H-r.bottom+45
+      naturalH,
+      available+60
     );
 
+
+  const drawY=
+    r.bottom-18;
+
+
   ctx.drawImage(
-    ruinImg,
 
-    0,
-    bottomSourceY,
-    iw,
-    bottomSourceH,
+    img,
 
-    r.x-(bottomW-r.w)/2,
-    r.bottom-16,
+    r.x,
+    drawY,
 
-    bottomW,
-    bottomH
+    drawW,
+    drawH
   );
 }
 
 
-// ===============================
+// =====================================
 // PLAYER
-// ===============================
+// =====================================
 
 function drawPlayer(){
 
   ctx.save();
+
 
   ctx.translate(
     player.x-recoil,
     player.y
   );
 
-  const angle=Math.max(
-    -.17,
-    Math.min(.20,player.vy*.023)
-  );
+
+  const angle=
+    Math.max(
+      -.17,
+      Math.min(
+        .20,
+        player.vy*.023
+      )
+    );
+
 
   ctx.rotate(angle);
 
@@ -654,10 +938,14 @@ function drawPlayer(){
       raptorImg.naturalHeight/
       raptorImg.naturalWidth;
 
+
     ctx.drawImage(
+
       raptorImg,
+
       -w*.47,
       -h*.5,
+
       w,
       h
     );
@@ -665,24 +953,35 @@ function drawPlayer(){
   }else{
 
     ctx.fillStyle="#d9302c";
+
     ctx.beginPath();
-    ctx.arc(0,0,18,0,Math.PI*2);
+
+    ctx.arc(
+      0,0,18,
+      0,
+      Math.PI*2
+    );
+
     ctx.fill();
   }
+
 
   ctx.restore();
 }
 
 
-// ===============================
-// ENEMIES
-// ===============================
+// =====================================
+// ENEMY
+// =====================================
 
 function drawEnemy(e){
 
   ctx.save();
 
-  ctx.translate(e.x,e.y);
+  ctx.translate(
+    e.x,
+    e.y
+  );
 
   ctx.scale(-1,1);
 
@@ -699,10 +998,14 @@ function drawEnemy(e){
       enemyImg.naturalHeight/
       enemyImg.naturalWidth;
 
+
     ctx.drawImage(
+
       enemyImg,
+
       -w/2,
       -h/2,
+
       w,
       h
     );
@@ -712,17 +1015,24 @@ function drawEnemy(e){
     ctx.fillStyle="#f7942d";
 
     ctx.beginPath();
-    ctx.arc(0,0,20,0,Math.PI*2);
+
+    ctx.arc(
+      0,0,20,
+      0,
+      Math.PI*2
+    );
+
     ctx.fill();
   }
+
 
   ctx.restore();
 }
 
 
-// ===============================
+// =====================================
 // BULLETS
-// ===============================
+// =====================================
 
 function drawBullets(){
 
@@ -762,21 +1072,26 @@ function drawBullets(){
 }
 
 
-// ===============================
+// =====================================
 // PARTICLES
-// ===============================
+// =====================================
 
 function drawParticles(){
 
   for(const p of particles){
 
     ctx.globalAlpha=
-      Math.max(0,p.life/28);
+      Math.max(
+        0,
+        p.life/28
+      );
+
 
     ctx.fillStyle=
       p.type==="orange"
       ? "#ff9a25"
       : "#ff3933";
+
 
     ctx.beginPath();
 
@@ -791,13 +1106,14 @@ function drawParticles(){
     ctx.fill();
   }
 
+
   ctx.globalAlpha=1;
 }
 
 
-// ===============================
+// =====================================
 // HUD
-// ===============================
+// =====================================
 
 function drawHUD(){
 
@@ -805,10 +1121,15 @@ function drawHUD(){
 
   ctx.fillStyle="#fff";
 
-  ctx.shadowColor="rgba(0,0,0,.65)";
+  ctx.shadowColor=
+    "rgba(0,0,0,.7)";
+
   ctx.shadowBlur=4;
 
-  ctx.font="bold 30px Arial";
+
+  ctx.font=
+    "bold 30px Arial";
+
 
   ctx.fillText(
     score,
@@ -817,7 +1138,9 @@ function drawHUD(){
   );
 
 
-  ctx.font="bold 14px Arial";
+  ctx.font=
+    "bold 14px Arial";
+
 
   ctx.fillText(
     "BEST "+high,
@@ -825,17 +1148,20 @@ function drawHUD(){
     75
   );
 
+
   ctx.shadowBlur=0;
 }
 
 
-// ===============================
-// START SCREEN
-// ===============================
+// =====================================
+// START
+// =====================================
 
 function drawStart(){
 
-  ctx.fillStyle="rgba(12,28,24,.62)";
+  ctx.fillStyle=
+    "rgba(12,28,24,.62)";
+
 
   ctx.fillRect(
     22,
@@ -849,7 +1175,10 @@ function drawStart(){
 
 
   ctx.fillStyle="#fff";
-  ctx.font="bold 38px Arial";
+
+  ctx.font=
+    "bold 38px Arial";
+
 
   ctx.fillText(
     "DINO",
@@ -860,6 +1189,7 @@ function drawStart(){
 
   ctx.fillStyle="#ff3933";
 
+
   ctx.fillText(
     "INVADERS",
     W/2,
@@ -868,7 +1198,10 @@ function drawStart(){
 
 
   ctx.fillStyle="#fff";
-  ctx.font="16px Arial";
+
+  ctx.font=
+    "16px Arial";
+
 
   ctx.fillText(
     "CYBER RAPTOR ONLINE",
@@ -877,7 +1210,9 @@ function drawStart(){
   );
 
 
-  ctx.font="bold 21px Arial";
+  ctx.font=
+    "bold 21px Arial";
+
 
   ctx.fillText(
     "TAP TO START",
@@ -887,13 +1222,15 @@ function drawStart(){
 }
 
 
-// ===============================
+// =====================================
 // GAME OVER
-// ===============================
+// =====================================
 
 function drawDead(){
 
-  ctx.fillStyle="rgba(12,28,24,.70)";
+  ctx.fillStyle=
+    "rgba(12,28,24,.70)";
+
 
   ctx.fillRect(
     25,
@@ -907,7 +1244,10 @@ function drawDead(){
 
 
   ctx.fillStyle="#ff3933";
-  ctx.font="bold 31px Arial";
+
+  ctx.font=
+    "bold 31px Arial";
+
 
   ctx.fillText(
     "SYSTEM DOWN",
@@ -917,7 +1257,10 @@ function drawDead(){
 
 
   ctx.fillStyle="#fff";
-  ctx.font="21px Arial";
+
+  ctx.font=
+    "21px Arial";
+
 
   ctx.fillText(
     "Score: "+score,
@@ -926,7 +1269,9 @@ function drawDead(){
   );
 
 
-  ctx.font="bold 20px Arial";
+  ctx.font=
+    "bold 20px Arial";
+
 
   ctx.fillText(
     "TAP TO REBOOT",
@@ -936,26 +1281,41 @@ function drawDead(){
 }
 
 
-// ===============================
+// =====================================
 // DRAW
-// ===============================
+// =====================================
 
 function draw(){
 
   drawBackground();
 
+
+  /*
+    Separate images.
+    No crop.
+    No split.
+    No flip.
+  */
+
   for(const r of ruins){
-    drawRuin(r);
+
+    drawTopRuin(r);
+    drawBottomRuin(r);
   }
 
+
   drawBullets();
+
 
   for(const e of enemies){
     drawEnemy(e);
   }
 
+
   drawParticles();
+
   drawPlayer();
+
   drawHUD();
 
 
@@ -963,15 +1323,16 @@ function draw(){
     drawStart();
   }
 
+
   if(state==="dead"){
     drawDead();
   }
 }
 
 
-// ===============================
+// =====================================
 // LOOP
-// ===============================
+// =====================================
 
 function loop(){
 
@@ -985,10 +1346,12 @@ function loop(){
 canvas.addEventListener(
   "pointerdown",
   function(e){
+
     e.preventDefault();
     tap();
   }
 );
+
 
 loop();
 
